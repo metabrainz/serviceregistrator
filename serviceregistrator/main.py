@@ -16,6 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from docker.models.containers import Container
 import click
 import docker
 import logging
@@ -37,14 +38,100 @@ def configure_logging(options):
             pass
 
     logging.basicConfig(
-        level=logging.DEBUG,
-        format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+        level=logging.ERROR,
+        format='[%(asctime)s] {%(module)s:%(lineno)d} %(levelname)s - %(message)s',
         handlers=handlers
     )
     try:
         log.setLevel(options['loglevel'])
     except ValueError as e:
         log.error(e)
+
+
+# Monkey Patch
+# @see https://github.com/docker/docker-py/pull/1726
+
+
+@property
+def health(self):
+    """
+    The health of the app in the container.
+    """
+    if self.attrs['State'].get('Health') is not None:
+        return self.attrs['State']['Health']['Status']
+    else:
+        return 'none'
+
+
+Container.health = health
+
+
+class ServiceRegistrator:
+
+    def __init__(self, config):
+        self.config = config
+        self.docker_client = docker.from_env()
+        self.docker_api_client = docker.APIClient(
+            base_url='unix://var/run/docker.sock')
+        self.containers = {}
+
+    def listen_events(self):
+        yield from self.docker_client.events(decode=True)
+
+    def dump_events(self):
+        # TODO: handle exceptions
+        for event in self.listen_events():
+            action = event['Action']
+            etype = event['Type']
+
+            # with only listen for container events
+            if etype != 'container':
+                continue
+
+            # print(event)
+
+            # Ignore health checks
+            if action.startswith("exec_"):
+                continue
+
+            # Ignore image destroy (ecs does this regularly)
+            if action == 'destroy':
+                continue
+
+            print(event)
+
+            cid = event['Actor']['ID']
+            if cid in self.containers:
+                log.info("Known container: {}".format(cid))
+
+            log.info("Event [{}] type=[{}] cid=[{}]".format(
+                action, etype, cid))
+
+            if action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
+                log.debug('deregister')
+                # continue
+
+            if action in ('health_status: healthy', 'start'):
+                log.debug('register')
+                # continue
+
+            # TODO: handle event
+            print(event)
+            container = self.docker_client.containers.get(cid)
+            print(container.attrs['Config']['Env'])
+
+    def list_containers(self):
+        # print(self.docker_client.containers)
+        for container in self.docker_client.containers.list(all=True, sparse=True):
+            # print(container.attrs)
+            attrs = container.attrs
+            cid = container.id
+            state = container.status
+            if state == 'running' and cid not in self.containers:
+                container.reload()  # needed since we use sparse, and want health
+                self.containers[cid] = container
+                # print(container.attrs)
+                # print(container.health)
 
 
 @click.command()
@@ -57,7 +144,9 @@ def main(config, **options):
     try:
         log.info("Starting...")
         log.debug("debug")
-
+        serviceregistrator = ServiceRegistrator(config)
+        serviceregistrator.list_containers()
+        serviceregistrator.dump_events()
     except KeyboardInterrupt:
         log.info("KeyboardInterrupt... exiting gracefully")
     except SystemExit:
