@@ -66,6 +66,18 @@ def health(self):
 Container.health = health
 
 
+class Service:
+
+    def __init__(self, id_, name, ip, port, tags=None, attrs=None):
+        ## https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
+        self.id = id_      # string               // unique service instance ID
+        self.name = name   # string               // service name
+        self.ip = ip       # string               // IP address service is located at
+        self.port = port   # int                  // port service is listening on
+        self.tags = tags if not None else []        # []string             // extra tags to classify service
+        self.attrs = attrs if not None else dict()  # map[string]string    // extra attribute metadata
+
+
 class ServiceRegistrator:
 
     def __init__(self, config):
@@ -119,6 +131,26 @@ class ServiceRegistrator:
             print(event)
             container = self.docker_client.containers.get(cid)
             print(container.attrs['Config']['Env'])
+
+            def parse_meta(meta):
+                metadata = dict()
+                prefix = 'SERVICE_'
+                for item in meta:
+                    if item.startswith(prefix):
+                        k, v = item.split('=', 2)
+                        key = k[len(prefix):].lower()
+                        metadata[k] = v
+                return metadata
+
+            print(parse_meta(container.attrs['Config']['Env']))
+
+            #print(container.attrs['NetworkSettings']['Ports'])
+            port_data = container.attrs['NetworkSettings']['Ports']
+            if port_data:
+                ports = [(int(k.split("/")[0]), int(p[0]['HostPort'])) for k,p in port_data.items() if p]
+            else:
+                ports = None
+            print(ports)
 
     def list_containers(self):
         # print(self.docker_client.containers)
