@@ -1,13 +1,22 @@
 #!/bin/bash
-docker rm -f dummyservice
 docker build . -t dummyservice
 
-docker run -d \
-	--env SERVICE_5000_CHECK_INTERVAL=30s \
-        --env SERVICE_5000_CHECK_TCP=true \
-        --env SERVICE_5000_CHECK_TIMEOUT=10s \
-        --env SERVICE_5000_NAME=dummyservice \
-        --env SERVICE_5000_TAGS=prod,dummytag \
-	--name dummyservice \
-	-p 8081:80 \
-	dummyservice
+function runservice() {
+	INTPORT=80
+	EXTPORT=$1
+	NAME="dummyservice${EXTPORT}"
+	docker rm -f "$NAME"
+	docker run -d \
+		--hostname "$HOSTNAME" \
+		--env "SERVICE_${INTPORT}_CHECK_INTERVAL=30s" \
+		--env "SERVICE_${INTPORT}_CHECK_TCP=true" \
+		--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+		--env "SERVICE_${INTPORT}_NAME=dummyservice" \
+		--env "SERVICE_${INTPORT}_TAGS=prod,dummytag" \
+		--name "$NAME" \
+		--publish "${EXTPORT}:${INTPORT}" \
+		dummyservice
+}
+
+runservice 8081
+runservice 8082
