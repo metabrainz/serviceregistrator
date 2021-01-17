@@ -166,12 +166,35 @@ class ServiceRegistrator:
                 # print(container.health)
 
 
+class Config:
+
+    def __init__(self, options):
+        self.options = options
+        configure_logging(options)
+
+
+def loglevelfmt(ctx, param, value):
+    if value is not None:
+        return value.upper()
+
+
+POSSIBLE_LEVELS = (
+    'CRITICAL',
+    'ERROR',
+    'WARNING',
+    'INFO',
+    'DEBUG',
+)
+
 @click.command()
-@click.option('-c', '--config', default=None)
-@click.option('-lf', '--logfile', default=None)
-@click.option('-ll', '--loglevel', default="INFO")
-def main(config, **options):
-    configure_logging(options)
+@click.option('-lf', '--logfile', default=None, help="log file path")
+@click.option('-ll', '--loglevel', default="INFO", help="log level",
+              type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
+              callback=loglevelfmt)
+@click.option('-ip', '--ip', default='127.0.0.1', help="ip to use for services")
+def main(**options):
+    """Register docker services into consul"""
+    config = Config(options)
 
     try:
         log.info("Starting...")
