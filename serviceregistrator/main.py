@@ -16,11 +16,13 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+from collections import namedtuple
 from docker.models.containers import Container
 import click
 import docker
 import logging
 import traceback
+import re
 import sys
 
 
@@ -78,6 +80,39 @@ class Service:
         self.attrs = attrs if not None else dict()  # map[string]string    // extra attribute metadata
 
 
+class ContainerInfo:
+    def __init__(self, cid, name, ports, metadata, metadata_with_port):
+        self.cid = cid
+        self.name = name
+        self.ports = ports
+        self.metadata = metadata
+        self.metadata_with_port = metadata_with_port
+
+    def __str__(self):
+        return '==== name:{} ====\ncid:{}\nports:{}\nmetadata:{}\nmetadata_with_port:{}\n'.format(
+                self.name, self.cid, self.ports,
+                self.metadata, self.metadata_with_port)
+
+    def can_register(self):
+        return self.metadata or self.metadata_with_port
+
+    def register(self, containers):
+        log.info('register {}'.format(self.name))
+        if self.cid in containers:
+            log.info('updating {} containers'.format(self.name))
+        else:
+            log.info('adding {} to containers'.format(self.name))
+        containers[self.cid] = self
+
+    def unregister(self, containers):
+        log.info('register {}'.format(self.name))
+        try:
+            del containers[self.cid]
+            log.info('removing {} from containers'.format(self.name))
+        except KeyError:
+            pass
+
+
 class ServiceRegistrator:
 
     def __init__(self, config):
@@ -110,47 +145,93 @@ class ServiceRegistrator:
             if action == 'destroy':
                 continue
 
-            print(event)
+            # print(event)
 
             cid = event['Actor']['ID']
-            if cid in self.containers:
-                log.info("Known container: {}".format(cid))
-
             log.info("Event [{}] type=[{}] cid=[{}]".format(
                 action, etype, cid))
 
-            if action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
-                log.debug('deregister')
-                # continue
+            container_info = self.parse_container_meta(cid)
+            if not container_info.can_register():
+                continue
+            log.info(container_info)
+
+            if cid in self.containers and action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
+                container_info.unregister(self.containers)
+                continue
 
             if action in ('health_status: healthy', 'start'):
-                log.debug('register')
-                # continue
+                container_info.register(self.containers)
+                continue
 
-            # TODO: handle event
-            print(event)
-            container = self.docker_client.containers.get(cid)
-            print(container.attrs['Config']['Env'])
 
-            def parse_meta(meta):
-                metadata = dict()
-                prefix = 'SERVICE_'
-                for item in meta:
-                    if item.startswith(prefix):
-                        k, v = item.split('=', 2)
-                        key = k[len(prefix):].lower()
-                        metadata[k] = v
-                return metadata
+    def parse_container_meta(self, cid):
+        container = self.docker_client.containers.get(cid)
+        name = container.name
 
-            print(parse_meta(container.attrs['Config']['Env']))
+        # extract ports
+        port_data = container.attrs['NetworkSettings']['Ports']
+        # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}], '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'}, {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
+        ports = []
+        print(port_data)
+        if port_data:
+            ports = []
+            Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
+            for internal_port, external_ports in port_data.items():
+                port, protocol = internal_port.split('/')
+                for eport in external_ports:
+                    ports.append(Ports(internal=port, external=int(eport['HostPort']), protocol=protocol))
 
-            #print(container.attrs['NetworkSettings']['Ports'])
-            port_data = container.attrs['NetworkSettings']['Ports']
-            if port_data:
-                ports = [(int(k.split("/")[0]), int(p[0]['HostPort'])) for k,p in port_data.items() if p]
-            else:
-                ports = None
-            print(ports)
+            # example: [Ports(internal='180', external=18082, protocol='udp'), Ports(internal='80', external=28082, protocol='tcp'), Ports(internal='80', external=8082, protocol='tcp')]
+
+        #print("===== ports =====")
+        #print(ports)
+
+        def parse_service_meta(meta):
+            # extract SERVICE_* from container env
+            # There are 2 forms: one without port, one with port
+            # SERVICE_80_NAME=thisname
+            # SERVICE_NAME=thisname
+            # when port is specified it will be used for matching internal port service
+            # this is stored in two different dicts
+            # those with ports are stored in metadata_with_port[<port>]
+
+            def transform(value, key):
+                if key in ('tags', ):
+                    return value.split(',')
+                else:
+                    return value
+
+            # print(container.attrs['Config']['Env'])
+            service_port_regex = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
+            service_regex = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.+)$')
+            metadata = dict()
+            metadata_with_port = dict()
+            for elem in container.attrs['Config']['Env']:
+                #print(elem)
+                m = service_regex.match(elem)
+                if m:
+                    #print(m.groupdict())
+                    key = m.group('key')
+                    value = m.group('value')
+                    m = service_port_regex.match(key)
+                    if m:
+                        # matching SERVICE_<port>_
+                        #print(m.groupdict())
+                        key = m.group('key').lower()
+                        port = int(m.group('port'))
+                        if port not in metadata_with_port:
+                            metadata_with_port[port] = dict()
+                        metadata_with_port[port][key] = transform(value, key)
+                    else:
+                        key = key.lower()
+                        metadata[key] = transform(value, key)
+            return metadata, metadata_with_port
+
+        #print("===== env =======")
+        #print(container.attrs['Config']['Env'])
+        metadata, metadata_with_port = parse_service_meta(container.attrs['Config']['Env'])
+        return ContainerInfo(cid, name, ports, metadata, metadata_with_port)
 
     def list_containers(self):
         # print(self.docker_client.containers)
@@ -161,9 +242,14 @@ class ServiceRegistrator:
             state = container.status
             if state == 'running' and cid not in self.containers:
                 container.reload()  # needed since we use sparse, and want health
-                self.containers[cid] = container
+                container_info = self.parse_container_meta(cid)
+                if container_info.can_register():
+                    container_info.register(self.containers)
+                    log.info(container_info)
                 # print(container.attrs)
                 # print(container.health)
+
+                # TODO check if service is registered
 
 
 class Config:
@@ -188,7 +274,7 @@ POSSIBLE_LEVELS = (
 
 @click.command()
 @click.option('-lf', '--logfile', default=None, help="log file path")
-@click.option('-ll', '--loglevel', default="INFO", help="log level",
+@click.option('-ll', '--loglevel', default="DEBUG", help="log level",
               type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
               callback=loglevelfmt)
 @click.option('-ip', '--ip', default='127.0.0.1', help="ip to use for services")
