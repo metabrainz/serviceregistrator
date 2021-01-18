@@ -81,17 +81,19 @@ class Service:
 
 
 class ContainerInfo:
-    def __init__(self, cid, name, ports, metadata, metadata_with_port):
+    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname):
         self.cid = cid
         self.name = name
         self.ports = ports
         self.metadata = metadata
         self.metadata_with_port = metadata_with_port
+        self.hostname = hostname
 
     def __str__(self):
-        return '==== name:{} ====\ncid:{}\nports:{}\nmetadata:{}\nmetadata_with_port:{}\n'.format(
+        return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\n'.format(
                 self.name, self.cid, self.ports,
-                self.metadata, self.metadata_with_port)
+                self.metadata, self.metadata_with_port,
+                self.hostname)
 
     def can_register(self):
         return self.metadata or self.metadata_with_port
@@ -168,12 +170,13 @@ class ServiceRegistrator:
     def parse_container_meta(self, cid):
         container = self.docker_client.containers.get(cid)
         name = container.name
+        hostname = container.attrs['Config']['Hostname']
 
         # extract ports
         port_data = container.attrs['NetworkSettings']['Ports']
         # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}], '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'}, {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
         ports = []
-        print(port_data)
+        #print(port_data)
         if port_data:
             ports = []
             Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
@@ -231,7 +234,7 @@ class ServiceRegistrator:
         #print("===== env =======")
         #print(container.attrs['Config']['Env'])
         metadata, metadata_with_port = parse_service_meta(container.attrs['Config']['Env'])
-        return ContainerInfo(cid, name, ports, metadata, metadata_with_port)
+        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
     def list_containers(self):
         # print(self.docker_client.containers)
