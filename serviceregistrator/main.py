@@ -171,6 +171,8 @@ class ServiceRegistrator:
         container = self.docker_client.containers.get(cid)
         name = container.name
         hostname = container.attrs['Config']['Hostname']
+        #print(container.attrs)
+
 
         # extract ports
         port_data = container.attrs['NetworkSettings']['Ports']
@@ -190,7 +192,7 @@ class ServiceRegistrator:
         #print("===== ports =====")
         #print(ports)
 
-        def parse_service_meta(meta):
+        def parse_service_meta(container):
             # extract SERVICE_* from container env
             # There are 2 forms: one without port, one with port
             # SERVICE_80_NAME=thisname
@@ -199,41 +201,72 @@ class ServiceRegistrator:
             # this is stored in two different dicts
             # those with ports are stored in metadata_with_port[<port>]
 
+            # read from env vars
+            kv_from_env = dict()
+            service_regex = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
+            for elem in container.attrs['Config']['Env']:
+                m = service_regex.match(elem)
+                if m:
+                    #print(m.groupdict())
+                    key = m.group('key')
+                    value = m.group('value')
+                    kv_from_env[key] = value
+
+            # read from container labels
+            kv_from_labels = dict()
+            service_key_regex = re.compile(r'SERVICE_(?P<key>.+)$')
+            for key, value in container.labels.items():
+                m = service_key_regex.match(key)
+                if m:
+                    key = m.group('key')
+                    kv_from_labels[key] = value
+
             def transform(value, key):
                 if key in ('tags', ):
                     return value.split(',')
                 else:
                     return value
 
-            # print(container.attrs['Config']['Env'])
             service_port_regex = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
-            service_regex = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.+)$')
             metadata = dict()
             metadata_with_port = dict()
-            for elem in container.attrs['Config']['Env']:
-                #print(elem)
-                m = service_regex.match(elem)
+            def parse_service_key(key, value):
+                m = service_port_regex.match(key)
                 if m:
+                    # matching SERVICE_<port>_
                     #print(m.groupdict())
-                    key = m.group('key')
-                    value = m.group('value')
-                    m = service_port_regex.match(key)
-                    if m:
-                        # matching SERVICE_<port>_
-                        #print(m.groupdict())
-                        key = m.group('key').lower()
-                        port = int(m.group('port'))
-                        if port not in metadata_with_port:
-                            metadata_with_port[port] = dict()
-                        metadata_with_port[port][key] = transform(value, key)
-                    else:
-                        key = key.lower()
-                        metadata[key] = transform(value, key)
+                    key = m.group('key').lower()
+                    port = int(m.group('port'))
+                    if port not in metadata_with_port:
+                        metadata_with_port[port] = dict()
+                    metadata_with_port[port][key] = transform(value, key)
+                else:
+                    key = key.lower()
+                    metadata[key] = transform(value, key)
+
+            # values from env vars take precedence over the ones from labels
+            for key, value in kv_from_labels.items():
+                parse_service_key(key, value)
+            for key, value in kv_from_env.items():
+                parse_service_key(key, value)
+
+            # default to metadata without port, and concatenate tag lists
+            import copy
+            for port, meta in metadata_with_port.items():
+                new_metadata = copy.deepcopy(metadata)
+                for k, v in meta.items():
+                    if k in new_metadata:
+                        if isinstance(v, list) and isinstance(new_metadata[k], list):
+                            new_metadata[k].extend(v)
+                            continue
+                    new_metadata[k] = v
+                metadata_with_port[port] = new_metadata
+
             return metadata, metadata_with_port
 
         #print("===== env =======")
         #print(container.attrs['Config']['Env'])
-        metadata, metadata_with_port = parse_service_meta(container.attrs['Config']['Env'])
+        metadata, metadata_with_port = parse_service_meta(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
     def list_containers(self):
