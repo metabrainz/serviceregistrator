@@ -38,7 +38,7 @@ def configure_logging(options):
         try:
             filehandler = logging.FileHandler(filename=options['logfile'])
             handlers.append(filehandler)
-        except Exception as e:
+        except Exception:
             pass
 
     logging.basicConfig(
@@ -220,7 +220,9 @@ class ServiceRegistrator:
     def extract_ports(container):
         # extract ports
         port_data = container.attrs['NetworkSettings']['Ports']
-        # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}], '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'}, {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
+        # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
+        #           '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'},
+        #                      {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
         ports = []
         if port_data:
             ports = []
@@ -236,20 +238,22 @@ class ServiceRegistrator:
                         )
                     )
 
-            # example: [Ports(internal='180', external=18082, protocol='udp'), Ports(internal='80', external=28082, protocol='tcp'), Ports(internal='80', external=8082, protocol='tcp')]
+            # example: [Ports(internal='180', external=18082, protocol='udp'),
+            #           Ports(internal='80', external=28082, protocol='tcp'),
+            #           Ports(internal='80', external=8082, protocol='tcp')]
         return ports
 
     @staticmethod
     def parse_service_meta(container):
-        # extract SERVICE_* from container env
+        # extract SERVICE_* from container env
         # There are 2 forms: one without port, one with port
         # SERVICE_80_NAME=thisname
         # SERVICE_NAME=thisname
         # when port is specified it will be used for matching internal port service
         # this is stored in two different dicts
-        # those with ports are stored in metadata_with_port[<port>]
+        # those with ports are stored in metadata_with_port[<port>]
 
-        # read from env vars
+        # read from env vars
         kv_from_env = dict()
         for elem in container.attrs['Config']['Env']:
             m = SERVICE_KEYVAL_REGEX.match(elem)
@@ -288,7 +292,7 @@ class ServiceRegistrator:
         for key, value in kv_from_env.items():
             parse_service_key(key, value)
 
-        # default to metadata without port, and concatenate tag lists
+        # default to metadata without port, and concatenate tag lists
         new_metadata_with_port = dict()
         for port, meta in metadata_with_port.items():
             new_metadata_with_port[port] = copy.deepcopy(metadata)
@@ -310,7 +314,6 @@ class ServiceRegistrator:
 
     def list_containers(self):
         for container in self.docker_running_containers():
-            attrs = container.attrs
             cid = container.id
             if cid not in self.containers:
                 container.reload()  # needed since we use sparse, and want health
