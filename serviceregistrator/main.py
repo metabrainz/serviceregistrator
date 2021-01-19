@@ -19,6 +19,7 @@
 from collections import namedtuple
 from docker.models.containers import Container
 import click
+import copy
 import docker
 import logging
 import traceback
@@ -257,7 +258,6 @@ class ServiceRegistrator:
             parse_service_key(key, value)
 
         # default to metadata without port, and concatenate tag lists
-        import copy
         for port, meta in metadata_with_port.items():
             new_metadata = copy.deepcopy(metadata)
             for k, v in meta.items():
