@@ -281,22 +281,20 @@ class ServiceRegistrator:
         ports = self.extract_ports(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
-    def docker_containers_list(self):
-        return self.docker_client.containers.list(all=True, sparse=True)
+    def docker_running_containers(self):
+        return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
 
     def list_containers(self):
-        for container in self.docker_containers_list():
+        for container in self.docker_running_containers():
             attrs = container.attrs
             cid = container.id
-            state = container.status
-            if state == 'running' and cid not in self.containers:
+            if cid not in self.containers:
                 container.reload()  # needed since we use sparse, and want health
                 container_info = self.parse_container_meta(cid)
                 if container_info.can_register():
                     container_info.register(self.containers)
                     log.info(container_info)
                 # TODO check if service is registered
-
 
 class Config:
 
