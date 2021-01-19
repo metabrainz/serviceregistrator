@@ -124,6 +124,8 @@ SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
 SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
 SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
 
+Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
+
 
 class ServiceRegistrator:
     _docker_sock = 'unix://var/run/docker.sock'
@@ -192,7 +194,6 @@ class ServiceRegistrator:
         ports = []
         if port_data:
             ports = []
-            Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
             for internal_port, external_ports in port_data.items():
                 port, protocol = internal_port.split('/')
                 for eport in external_ports:
