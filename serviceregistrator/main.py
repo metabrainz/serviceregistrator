@@ -71,13 +71,15 @@ Container.health = health
 class Service:
 
     def __init__(self, id_, name, ip, port, tags=None, attrs=None):
-        ## https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
+        #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
         self.id = id_      # string               // unique service instance ID
         self.name = name   # string               // service name
         self.ip = ip       # string               // IP address service is located at
         self.port = port   # int                  // port service is listening on
-        self.tags = tags if not None else []        # []string             // extra tags to classify service
-        self.attrs = attrs if not None else dict()  # map[string]string    // extra attribute metadata
+        # []string             // extra tags to classify service
+        self.tags = tags if not None else []
+        #  map[string]string    // extra attribute metadata
+        self.attrs = attrs if not None else dict()
 
 
 class ContainerInfo:
@@ -91,9 +93,9 @@ class ContainerInfo:
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\n'.format(
-                self.name, self.cid, self.ports,
-                self.metadata, self.metadata_with_port,
-                self.hostname)
+            self.name, self.cid, self.ports,
+            self.metadata, self.metadata_with_port,
+            self.hostname)
 
     def can_register(self):
         return self.metadata or self.metadata_with_port
@@ -187,7 +189,8 @@ class ServiceRegistrator:
             for internal_port, external_ports in port_data.items():
                 port, protocol = internal_port.split('/')
                 for eport in external_ports:
-                    ports.append(Ports(internal=port, external=int(eport['HostPort']), protocol=protocol))
+                    ports.append(Ports(internal=port, external=int(
+                        eport['HostPort']), protocol=protocol))
 
             # example: [Ports(internal='180', external=18082, protocol='udp'), Ports(internal='80', external=28082, protocol='tcp'), Ports(internal='80', external=8082, protocol='tcp')]
 
@@ -206,7 +209,7 @@ class ServiceRegistrator:
             for elem in container.attrs['Config']['Env']:
                 m = service_regex.match(elem)
                 if m:
-                    #print(m.groupdict())
+                    # print(m.groupdict())
                     key = m.group('key')
                     value = m.group('value')
                     kv_from_env[key] = value
@@ -229,6 +232,7 @@ class ServiceRegistrator:
             service_port_regex = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
             metadata = dict()
             metadata_with_port = dict()
+
             def parse_service_key(key, value):
                 m = service_port_regex.match(key)
                 if m:
@@ -301,6 +305,7 @@ POSSIBLE_LEVELS = (
     'INFO',
     'DEBUG',
 )
+
 
 @click.command()
 @click.option('-lf', '--logfile', default=None, help="log file path")
