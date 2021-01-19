@@ -211,7 +211,28 @@ class ServiceRegistrator:
         return ports
 
     @staticmethod
-    def parse_service_meta(container):
+    def parse_env(env):
+        kv = dict()
+        for elem in env:
+            m = SERVICE_KEYVAL_REGEX.match(elem)
+            if m:
+                key = m.group('key')
+                value = m.group('value')
+                kv[key] = value
+        return kv
+
+    @staticmethod
+    def parse_labels(labels):
+        kv = dict()
+        for key, value in labels.items():
+            m = SERVICE_KEY_REGEX.match(key)
+            if m:
+                key = m.group('key')
+                kv[key] = value
+        return kv
+
+    @classmethod
+    def parse_service_meta(cls, container):
         # extract SERVICE_* from container env
         # There are 2 forms: one without port, one with port
         # SERVICE_80_NAME=thisname
@@ -221,22 +242,10 @@ class ServiceRegistrator:
         # those with ports are stored in metadata_with_port[<port>]
 
         # read from env vars
-        kv_from_env = dict()
-        for elem in container.attrs['Config']['Env']:
-            m = SERVICE_KEYVAL_REGEX.match(elem)
-            if m:
-                # print(m.groupdict())
-                key = m.group('key')
-                value = m.group('value')
-                kv_from_env[key] = value
+        kv_from_env = cls.parse_env(container.attrs['Config']['Env'])
 
         # read from container labels
-        kv_from_labels = dict()
-        for key, value in container.labels.items():
-            m = SERVICE_KEY_REGEX.match(key)
-            if m:
-                key = m.group('key')
-                kv_from_labels[key] = value
+        kv_from_labels = cls.parse_labels(container.labels)
 
         metadata = ContainerMetadata()
         metadata_with_port = dict()
