@@ -174,11 +174,8 @@ class ServiceRegistrator:
     def docker_get_container_by_id(self, cid):
         return self.docker_client.containers.get(cid)
 
-    def parse_container_meta(self, cid):
-        container = self.docker_get_container_by_id(cid)
-        name = container.name
-        hostname = container.attrs['Config']['Hostname']
-
+    @staticmethod
+    def extract_ports(container):
         # extract ports
         port_data = container.attrs['NetworkSettings']['Ports']
         # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}], '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'}, {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
@@ -189,10 +186,21 @@ class ServiceRegistrator:
             for internal_port, external_ports in port_data.items():
                 port, protocol = internal_port.split('/')
                 for eport in external_ports:
-                    ports.append(Ports(internal=port, external=int(
-                        eport['HostPort']), protocol=protocol))
+                    ports.append(
+                        Ports(
+                            internal=port,
+                            external=int(eport['HostPort']),
+                            protocol=protocol
+                        )
+                    )
 
             # example: [Ports(internal='180', external=18082, protocol='udp'), Ports(internal='80', external=28082, protocol='tcp'), Ports(internal='80', external=8082, protocol='tcp')]
+        return ports
+
+    def parse_container_meta(self, cid):
+        container = self.docker_get_container_by_id(cid)
+        name = container.name
+        hostname = container.attrs['Config']['Hostname']
 
         def parse_service_meta(container):
             # extract SERVICE_* from container env
@@ -267,6 +275,7 @@ class ServiceRegistrator:
             return metadata, metadata_with_port
 
         metadata, metadata_with_port = parse_service_meta(container)
+        ports = self.extract_ports(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
     def docker_containers_list(self):
