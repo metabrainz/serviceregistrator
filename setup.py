@@ -12,6 +12,8 @@ requirements_file = os.path.join(here, 'requirements', 'base.txt')
 with open(requirements_file) as f:
     install_requires = f.read()
 
+packages = find_packages()
+
 setup_params = dict(
     name='serviceregistrator',
     description='MetaBrainz Docker/Consul Services Registration',
@@ -29,7 +31,7 @@ setup_params = dict(
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)'
         'Programming Language :: Python :: 3'
     ],
-    packages=['serviceregistrator'],
+    packages=packages,
     install_requires=install_requires,
     entry_points={
         'console_scripts': [
@@ -37,6 +39,8 @@ setup_params = dict(
         ]
     },
     python_requires='>=3.6',
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
 )
 
 if __name__ == '__main__':
