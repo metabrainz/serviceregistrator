@@ -144,8 +144,6 @@ class ServiceRegistrator:
             if etype != 'container':
                 continue
 
-            # print(event)
-
             # Ignore health checks
             if action.startswith("exec_"):
                 continue
@@ -153,8 +151,6 @@ class ServiceRegistrator:
             # Ignore image destroy (ecs does this regularly)
             if action == 'destroy':
                 continue
-
-            # print(event)
 
             cid = event['Actor']['ID']
             log.info("Event [{}] type=[{}] cid=[{}]".format(
@@ -180,14 +176,11 @@ class ServiceRegistrator:
         container = self.docker_get_container_by_id(cid)
         name = container.name
         hostname = container.attrs['Config']['Hostname']
-        #print(container.attrs)
-
 
         # extract ports
         port_data = container.attrs['NetworkSettings']['Ports']
         # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}], '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'}, {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
         ports = []
-        #print(port_data)
         if port_data:
             ports = []
             Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
@@ -197,9 +190,6 @@ class ServiceRegistrator:
                     ports.append(Ports(internal=port, external=int(eport['HostPort']), protocol=protocol))
 
             # example: [Ports(internal='180', external=18082, protocol='udp'), Ports(internal='80', external=28082, protocol='tcp'), Ports(internal='80', external=8082, protocol='tcp')]
-
-        #print("===== ports =====")
-        #print(ports)
 
         def parse_service_meta(container):
             # extract SERVICE_* from container env
@@ -243,7 +233,6 @@ class ServiceRegistrator:
                 m = service_port_regex.match(key)
                 if m:
                     # matching SERVICE_<port>_
-                    #print(m.groupdict())
                     key = m.group('key').lower()
                     port = int(m.group('port'))
                     if port not in metadata_with_port:
@@ -273,8 +262,6 @@ class ServiceRegistrator:
 
             return metadata, metadata_with_port
 
-        #print("===== env =======")
-        #print(container.attrs['Config']['Env'])
         metadata, metadata_with_port = parse_service_meta(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
@@ -282,9 +269,7 @@ class ServiceRegistrator:
         return self.docker_client.containers.list(all=True, sparse=True)
 
     def list_containers(self):
-        # print(self.docker_client.containers)
         for container in self.docker_containers_list():
-            # print(container.attrs)
             attrs = container.attrs
             cid = container.id
             state = container.status
@@ -294,9 +279,6 @@ class ServiceRegistrator:
                 if container_info.can_register():
                     container_info.register(self.containers)
                     log.info(container_info)
-                # print(container.attrs)
-                # print(container.health)
-
                 # TODO check if service is registered
 
 
