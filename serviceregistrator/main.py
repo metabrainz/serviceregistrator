@@ -118,6 +118,11 @@ class ContainerInfo:
             pass
 
 
+SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
+SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
+SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
+
+
 class ServiceRegistrator:
     _docker_sock = 'unix://var/run/docker.sock'
 
@@ -210,9 +215,8 @@ class ServiceRegistrator:
 
         # read from env vars
         kv_from_env = dict()
-        service_regex = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
         for elem in container.attrs['Config']['Env']:
-            m = service_regex.match(elem)
+            m = SERVICE_KEYVAL_REGEX.match(elem)
             if m:
                 # print(m.groupdict())
                 key = m.group('key')
@@ -221,9 +225,8 @@ class ServiceRegistrator:
 
         # read from container labels
         kv_from_labels = dict()
-        service_key_regex = re.compile(r'SERVICE_(?P<key>.+)$')
         for key, value in container.labels.items():
-            m = service_key_regex.match(key)
+            m = SERVICE_KEY_REGEX.match(key)
             if m:
                 key = m.group('key')
                 kv_from_labels[key] = value
@@ -234,12 +237,11 @@ class ServiceRegistrator:
             else:
                 return value
 
-        service_port_regex = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
         metadata = dict()
         metadata_with_port = dict()
 
         def parse_service_key(key, value):
-            m = service_port_regex.match(key)
+            m = SERVICE_PORT_REGEX.match(key)
             if m:
                 # matching SERVICE_<port>_
                 key = m.group('key').lower()
