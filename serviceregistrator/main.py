@@ -116,13 +116,20 @@ class ContainerInfo:
 
 
 class ServiceRegistrator:
+    _docker_sock = 'unix://var/run/docker.sock'
 
     def __init__(self, config):
         self.config = config
-        self.docker_client = docker.from_env()
-        self.docker_api_client = docker.APIClient(
-            base_url='unix://var/run/docker.sock')
+        self._init_docker()
+        self._init_consul()
         self.containers = {}
+
+    def _init_docker(self):
+        self.docker_client = docker.from_env()
+        self.docker_api_client = docker.APIClient(base_url=self._docker_sock)
+
+    def _init_consul(self):
+        pass
 
     def listen_events(self):
         yield from self.docker_client.events(decode=True)
@@ -166,9 +173,11 @@ class ServiceRegistrator:
                 container_info.register(self.containers)
                 continue
 
+    def docker_get_container_by_id(self, cid):
+        return self.docker_client.containers.get(cid)
 
     def parse_container_meta(self, cid):
-        container = self.docker_client.containers.get(cid)
+        container = self.docker_get_container_by_id(cid)
         name = container.name
         hostname = container.attrs['Config']['Hostname']
         #print(container.attrs)
@@ -269,9 +278,12 @@ class ServiceRegistrator:
         metadata, metadata_with_port = parse_service_meta(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
+    def docker_containers_list(self):
+        return self.docker_client.containers.list(all=True, sparse=True)
+
     def list_containers(self):
         # print(self.docker_client.containers)
-        for container in self.docker_client.containers.list(all=True, sparse=True):
+        for container in self.docker_containers_list():
             # print(container.attrs)
             attrs = container.attrs
             cid = container.id
