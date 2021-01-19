@@ -17,6 +17,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 from collections import namedtuple
+from collections import UserDict
 from docker.models.containers import Container
 import click
 import copy
@@ -116,6 +117,41 @@ class ContainerInfo:
             log.info('removing {} from containers'.format(self.name))
         except KeyError:
             pass
+
+
+class ContainerMetadata(UserDict):
+    def __setitem__(self, key, value):
+        # all keys are lowered
+        key = key.lower()
+        if key in ('tags', ):
+            # handle lists merging
+            if value is None:
+                value = []
+            elif not isinstance(value, list):
+                value = list(set(value.split(',')))
+            if key in self:
+                # uniqify
+                super().__setitem__(key, list(set(self[key] + value)))
+            else:
+                super().__setitem__(key, value)
+
+        elif key in ('name', 'id'):
+            # those keys are added as is
+            super().__setitem__(key, value)
+        elif key in ('attrs', ):
+            # handle dict merging
+            if key in self:
+                self[key].update(value)
+            else:
+                super().__setitem__(key, value)
+        else:
+            # all other keys are added as attributes
+            if 'attrs' not in self:
+                super().__setitem__('attrs', dict())
+            self['attrs'][key] = value
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.data})"
 
 
 SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
@@ -231,27 +267,20 @@ class ServiceRegistrator:
                 key = m.group('key')
                 kv_from_labels[key] = value
 
-        def transform(value, key):
-            if key in ('tags', ):
-                return value.split(',')
-            else:
-                return value
-
-        metadata = dict()
+        metadata = ContainerMetadata()
         metadata_with_port = dict()
 
         def parse_service_key(key, value):
             m = SERVICE_PORT_REGEX.match(key)
             if m:
                 # matching SERVICE_<port>_
-                key = m.group('key').lower()
+                key = m.group('key')
                 port = int(m.group('port'))
                 if port not in metadata_with_port:
-                    metadata_with_port[port] = dict()
-                metadata_with_port[port][key] = transform(value, key)
+                    metadata_with_port[port] = ContainerMetadata()
+                metadata_with_port[port][key] = value
             else:
-                key = key.lower()
-                metadata[key] = transform(value, key)
+                metadata[key] = value
 
         # values from env vars take precedence over the ones from labels
         for key, value in kv_from_labels.items():
@@ -260,17 +289,12 @@ class ServiceRegistrator:
             parse_service_key(key, value)
 
         # default to metadata without port, and concatenate tag lists
+        new_metadata_with_port = dict()
         for port, meta in metadata_with_port.items():
-            new_metadata = copy.deepcopy(metadata)
-            for k, v in meta.items():
-                if k in new_metadata:
-                    if isinstance(v, list) and isinstance(new_metadata[k], list):
-                        new_metadata[k].extend(v)
-                        continue
-                new_metadata[k] = v
-            metadata_with_port[port] = new_metadata
+            new_metadata_with_port[port] = copy.deepcopy(metadata)
+            new_metadata_with_port[port].update(meta)
 
-        return metadata, metadata_with_port
+        return metadata, new_metadata_with_port
 
     def parse_container_meta(self, cid):
         container = self.docker_get_container_by_id(cid)
@@ -295,6 +319,7 @@ class ServiceRegistrator:
                     container_info.register(self.containers)
                     log.info(container_info)
                 # TODO check if service is registered
+
 
 class Config:
 
