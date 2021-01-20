@@ -167,18 +167,18 @@ Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
 
 
 class ServiceRegistrator:
-    _docker_sock = 'unix://var/run/docker.sock'
 
     def __init__(self, config):
         self.config = config
         log.info("Using IP: {}".format(config.options['ip']))
+        log.info("Using docker socket: {}".format(config.options['dockersock']))
         self._init_docker()
         self._init_consul()
         self.containers = self.config.containers
 
     def _init_docker(self):
         self.docker_client = docker.from_env()
-        self.docker_api_client = docker.APIClient(base_url=self._docker_sock)
+        self.docker_api_client = docker.APIClient(base_url=self.config.options['dockersock'])
 
     def _init_consul(self):
         pass
@@ -399,6 +399,7 @@ POSSIBLE_LEVELS = (
               callback=loglevelfmt)
 @click.option('-ip', '--ip', required=True, help="ip to use for services")
 @click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
+@click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
 def main(**options):
     """Register docker services into consul"""
     config = Config(options)
