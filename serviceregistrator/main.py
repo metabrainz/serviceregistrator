@@ -25,6 +25,7 @@ import logging
 import traceback
 import re
 import sys
+from time import sleep
 
 from serviceregistrator import ContainerMetadata
 
@@ -168,7 +169,7 @@ class ServiceRegistrator:
         log.info("Using IP: {}".format(config.options['ip']))
         self._init_docker()
         self._init_consul()
-        self.containers = {}
+        self.containers = self.config.containers
 
     def _init_docker(self):
         self.docker_client = docker.from_env()
@@ -362,6 +363,7 @@ class Config:
     def __init__(self, options):
         self.options = options
         configure_logging(options)
+        self.containers = {}
 
 
 def loglevelfmt(ctx, param, value):
@@ -384,24 +386,35 @@ POSSIBLE_LEVELS = (
               type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
               callback=loglevelfmt)
 @click.option('-ip', '--ip', required=True, help="ip to use for services")
+@click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
 def main(**options):
     """Register docker services into consul"""
     config = Config(options)
 
-    try:
-        log.info("Starting...")
-        log.debug("debug")
-        serviceregistrator = ServiceRegistrator(config)
-        serviceregistrator.list_containers()
-        serviceregistrator.dump_events()
-    except KeyboardInterrupt:
-        log.info("KeyboardInterrupt... exiting gracefully")
-    except SystemExit:
-        log.info("SystemExit... exiting gracefully")
-    except Exception:
-        log.error(traceback.format_exc())
-    finally:
-        log.debug("finally...")
+    while True:
+        try:
+            log.info("Starting...")
+            log.debug("debug")
+            serviceregistrator = ServiceRegistrator(config)
+            serviceregistrator.list_containers()
+            serviceregistrator.dump_events()
+        except docker.errors.DockerException as e:
+            log.error(e)
+        except KeyboardInterrupt:
+            log.info("KeyboardInterrupt... exiting gracefully")
+            break
+        except SystemExit:
+            log.info("SystemExit... exiting gracefully")
+            break
+        except Exception:
+            log.error(traceback.format_exc())
+            break
+        finally:
+            pass
+
+        delay = config.options['delay']
+        log.debug("sleeping {} second(s)...".format(delay))
+        sleep(delay)
 
 
 if __name__ == "__main__":
