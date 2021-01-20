@@ -22,6 +22,18 @@ source .venv/bin/activate
 pip install -r requirements/base.txt
 ```
 
+## Running (dev)
+
+
+```bash
+pip install -e .
+```
+
+```bash
+serviceregistrator
+```
+
+
 ## modules
 
 - https://docker-py.readthedocs.io/en/stable/
