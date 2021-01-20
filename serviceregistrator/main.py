@@ -90,6 +90,9 @@ class Service:
             self.id, self.name, self.ip,
             self.port, self.tags, self.attrs)
 
+    def __repr__(self):
+        return f"{type(self).__name__}('{self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs}')"
+
 
 class ContainerInfo:
     def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip):
@@ -102,10 +105,10 @@ class ContainerInfo:
         self.serviceip = serviceip
 
     def __str__(self):
-        return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\n'.format(
+        return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\nservices: \n{}\n'.format(
             self.name, self.cid, self.ports,
             self.metadata, self.metadata_with_port,
-            self.hostname)
+            self.hostname, self.services)
 
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
@@ -141,6 +144,7 @@ class ContainerInfo:
             service_port = port.external
             service_name = getattr('name', port.internal)
             if not service_name:
+                log.debug("Skipping port {}, no service name set".format(port))
                 continue
             service_tags = getattr('tags', port.internal) or []
             service_attrs = getattr('attrs', port.internal) or {}
@@ -148,8 +152,8 @@ class ContainerInfo:
             if port.protocol != 'tcp':
                 service_id += ":udp"
                 service_tags.append('udp')
-            service = Service(service_id, service_name, self.serviceip, port.external, tags=service_tags, attrs=service_attrs)
-            log.debug(service)
+            service = Service(service_id, service_name, self.serviceip,
+                              port.external, tags=service_tags, attrs=service_attrs)
             services.append(service)
         return services
 
@@ -334,10 +338,12 @@ class ServiceRegistrator:
         metadata, metadata_with_port = self.parse_service_meta(container)
         if not metadata and not metadata_with_port:
             # skip containers without SERVICE_*
+            log.debug("skip container {} without SERVICE_*".format(cid))
             return None
         ports = self.extract_ports(container)
         if not ports:
             # no exposed or published ports, skip
+            log.debug("skip container {} without exposed ports".format(cid))
             return None
         name = container.name
         hostname = container.attrs['Config']['Hostname']
@@ -355,7 +361,12 @@ class ServiceRegistrator:
                 if container_info:
                     container_info.register(self.containers)
                     log.info(container_info)
-                # TODO check if service is registered
+                elif container_info is not None:
+                    log.debug("Skipping {}".format(container_info))
+                else:
+                    log.debug("Skipping {}".format(cid))
+            else:
+                log.debug("{} already in containers".format(cid))
 
 
 class Config:
