@@ -100,8 +100,8 @@ class ContainerInfo:
             self.metadata, self.metadata_with_port,
             self.hostname)
 
-    def can_register(self):
-        return self.metadata or self.metadata_with_port
+    def __bool__(self):
+        return bool(self.metadata or self.metadata_with_port)
 
     def register(self, containers):
         log.info('register {}'.format(self.name))
@@ -124,7 +124,7 @@ SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
 SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
 SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
 
-Ports = namedtuple('Ports', ('internal', 'external', 'protocol'))
+Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
 
 
 class ServiceRegistrator:
@@ -169,7 +169,7 @@ class ServiceRegistrator:
                 action, etype, cid))
 
             container_info = self.parse_container_meta(cid)
-            if not container_info.can_register():
+            if not container_info:
                 continue
             log.info(container_info)
 
@@ -186,28 +186,46 @@ class ServiceRegistrator:
 
     @staticmethod
     def extract_ports(container):
-        # extract ports
-        port_data = container.attrs['NetworkSettings']['Ports']
-        # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
-        #           '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'},
-        #                      {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
-        ports = []
-        if port_data:
-            ports = []
-            for internal_port, external_ports in port_data.items():
-                port, protocol = internal_port.split('/')
-                for eport in external_ports:
-                    ports.append(
-                        Ports(
-                            internal=port,
-                            external=int(eport['HostPort']),
-                            protocol=protocol
-                        )
-                    )
+        """ Extract ports from container metadata"""
 
-            # example: [Ports(internal='180', external=18082, protocol='udp'),
-            #           Ports(internal='80', external=28082, protocol='tcp'),
-            #           Ports(internal='80', external=8082, protocol='tcp')]
+        defaultip = ""
+        networkmode = container.attrs['HostConfig']['NetworkMode']
+        if networkmode not in ('bridge', 'default', 'host'):
+            # not yet used
+            defaultip = container.attrs['NetworkSettings']['Networks'][networkmode]['IPAddress']
+        if not defaultip:
+            defaultip = "0.0.0.0"
+
+        ports = list()
+
+        if networkmode == 'host':
+            # Extract configured host port mappings, relevant when using --net=host
+            exposed_ports = container.attrs['Config']['ExposedPorts']
+            if exposed_ports:
+                for exposed_port in exposed_ports:
+                    port, protocol = exposed_port.split('/')
+                    ports.append(Ports(
+                        internal=int(port),
+                        external=int(port),
+                        protocol=protocol,
+                        ip=defaultip
+                    ))
+        else:
+            # Extract runtime port mappings, relevant when using --net=bridge
+            port_data = container.attrs['NetworkSettings']['Ports']
+            # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
+            #           '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'},
+            #                      {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
+            if port_data:
+                for internal_port, external_ports in port_data.items():
+                    port, protocol = internal_port.split('/')
+                    for eport in external_ports:
+                        ports.append(Ports(
+                            internal=int(port),
+                            external=int(eport['HostPort']),
+                            protocol=protocol,
+                            ip=eport['HostIp']
+                        ))
         return ports
 
     @staticmethod
@@ -278,11 +296,16 @@ class ServiceRegistrator:
 
     def parse_container_meta(self, cid):
         container = self.docker_get_container_by_id(cid)
+        metadata, metadata_with_port = self.parse_service_meta(container)
+        if not metadata and not metadata_with_port:
+            # skip containers without SERVICE_*
+            return None
+        ports = self.extract_ports(container)
+        if not ports:
+            # no exposed or published ports, skip
+            return None
         name = container.name
         hostname = container.attrs['Config']['Hostname']
-
-        metadata, metadata_with_port = self.parse_service_meta(container)
-        ports = self.extract_ports(container)
         return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
 
     def docker_running_containers(self):
@@ -294,7 +317,7 @@ class ServiceRegistrator:
             if cid not in self.containers:
                 container.reload()  # needed since we use sparse, and want health
                 container_info = self.parse_container_meta(cid)
-                if container_info.can_register():
+                if container_info:
                     container_info.register(self.containers)
                     log.info(container_info)
                 # TODO check if service is registered
