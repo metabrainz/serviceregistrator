@@ -22,7 +22,7 @@ source .venv/bin/activate
 pip install -r requirements/base.txt
 ```
 
-## Running (dev)
+## Running (dev)
 
 
 ```bash
@@ -34,7 +34,7 @@ serviceregistrator
 ```
 
 
-## modules
+## References
 
 - https://docker-py.readthedocs.io/en/stable/
 - https://python-consul.readthedocs.io/en/latest/
