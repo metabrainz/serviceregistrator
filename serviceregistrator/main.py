@@ -152,7 +152,8 @@ class ContainerInfo:
             if port.protocol != 'tcp':
                 service_id += ":udp"
                 service_tags.append('udp')
-            service = Service(service_id, service_name, self.serviceip,
+            service_ip = getattr('ip', port.internal) or self.serviceip
+            service = Service(service_id, service_name, service_ip,
                               port.external, tags=service_tags, attrs=service_attrs)
             services.append(service)
         return services

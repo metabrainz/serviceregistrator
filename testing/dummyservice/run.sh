@@ -11,6 +11,7 @@ function runservice() {
 		--env "SERVICE_${INTPORT}_CHECK_TCP=true" \
 		--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
 		--env "SERVICE_${INTPORT}_NAME=dummyservice" \
+		--env "SERVICE_${INTPORT}_IP=1.2.3.4" \
 		--env "SERVICE_NAME=dummyservicenoportfromenv" \
 		--env "SERVICE_TAGS=noporttag" \
 		--hostname "$HOSTNAME" \
