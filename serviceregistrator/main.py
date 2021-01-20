@@ -84,15 +84,22 @@ class Service:
         #  map[string]string    // extra attribute metadata
         self.attrs = attrs if not None else dict()
 
+    def __str__(self):
+        return '==== Service id: {} ====\nname: {}\nip: {}\nport: {}\ntags: {}\nattrs: {}\n'.format(
+            self.id, self.name, self.ip,
+            self.port, self.tags, self.attrs)
+
 
 class ContainerInfo:
-    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname):
+    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip):
         self.cid = cid
         self.name = name
         self.ports = ports
         self.metadata = metadata
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
+        self.serviceip = serviceip
+        self.services = self.make_services()
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\n'.format(
@@ -118,6 +125,32 @@ class ContainerInfo:
             log.info('removing {} from containers'.format(self.name))
         except KeyError:
             pass
+
+    def make_services(self):
+        def getattr(key, port):
+            if port in self.metadata_with_port and key in self.metadata_with_port[port]:
+                return self.metadata_with_port[port][key]
+            elif key in self.metadata:
+                return self.metadata[key]
+            else:
+                return None
+        services = list()
+        for port in self.ports:
+            service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
+            service_port = port.external
+            service_name = getattr('name', port.internal)
+            if not service_name:
+                continue
+            service_tags = getattr('tags', port.internal) or []
+            service_attrs = getattr('attrs', port.internal) or {}
+            service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
+            if port.protocol != 'tcp':
+                service_id += ":udp"
+                service_tags.append('udp')
+            service = Service(service_id, service_name, self.serviceip, port.external, tags=service_tags, attrs=service_attrs)
+            log.debug(service)
+            services.append(service)
+        return services
 
 
 SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
@@ -307,7 +340,7 @@ class ServiceRegistrator:
             return None
         name = container.name
         hostname = container.attrs['Config']['Hostname']
-        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname)
+        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname, self.config.options['ip'])
 
     def docker_running_containers(self):
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
