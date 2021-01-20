@@ -100,7 +100,6 @@ class ContainerInfo:
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
         self.serviceip = serviceip
-        self.services = self.make_services()
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\n'.format(
@@ -127,7 +126,8 @@ class ContainerInfo:
         except KeyError:
             pass
 
-    def make_services(self):
+    @property
+    def services(self):
         def getattr(key, port):
             if port in self.metadata_with_port and key in self.metadata_with_port[port]:
                 return self.metadata_with_port[port][key]
