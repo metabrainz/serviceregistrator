@@ -132,6 +132,7 @@ class ServiceRegistrator:
 
     def __init__(self, config):
         self.config = config
+        log.info("Using IP: {}".format(config.options['ip']))
         self._init_docker()
         self._init_consul()
         self.containers = {}
@@ -349,7 +350,7 @@ POSSIBLE_LEVELS = (
 @click.option('-ll', '--loglevel', default="DEBUG", help="log level",
               type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
               callback=loglevelfmt)
-@click.option('-ip', '--ip', default='127.0.0.1', help="ip to use for services")
+@click.option('-ip', '--ip', required=True, help="ip to use for services")
 def main(**options):
     """Register docker services into consul"""
     config = Config(options)
