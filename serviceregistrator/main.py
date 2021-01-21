@@ -104,6 +104,7 @@ class ContainerInfo:
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
         self.serviceip = serviceip
+        self.serviceid_prefix = None
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\nservices: \n{}\n'.format(
@@ -165,6 +166,8 @@ class ContainerInfo:
             if port.protocol != 'tcp':
                 service_id += ":" + port.protocol
                 service_tags.append(port.protocol)
+            if self.serviceid_prefix:
+                service_id = "{}:{}".format(self.serviceid_prefix, service_id)
             service_ip = getattr('ip', port.internal) or self.serviceip
             service = Service(service_id, service_name, service_ip,
                               port.external, tags=service_tags, attrs=service_attrs)
@@ -380,7 +383,11 @@ class ServiceRegistrator:
             return None
         name = container.name
         hostname = container.attrs['Config']['Hostname']
-        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname, self.context.options['ip'])
+        container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
+                                       hostname, self.context.options['ip'])
+        if self.context.options['serviceid_prefix']:
+            container_info.serviceid_prefix = self.context.options['serviceid_prefix']
+        return container_info
 
     def docker_running_containers(self):
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
@@ -466,6 +473,7 @@ POSSIBLE_LEVELS = (
 @click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
 @click.option('-dg', '--debug', is_flag=True, help='Enables debug mode')
+@click.option('-sp', '--serviceid-prefix', default=None, help='service ID prefix (for testing purposes)')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
