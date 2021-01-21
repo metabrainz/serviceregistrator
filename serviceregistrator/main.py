@@ -392,6 +392,10 @@ class Context:
         # exit signals
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
+        # following signals may be used later
+        signal.signal(signal.SIGHUP, self.ignore_signal)
+        signal.signal(signal.SIGUSR1, self.ignore_signal)
+        signal.signal(signal.SIGUSR2, self.ignore_signal)
 
     def _log_signal(self, signum):
         if self._sig2name is None:
@@ -401,6 +405,9 @@ class Context:
 
         name = self._sig2name.get(signum, signum)
         log.info("Received {} signal".format(name))
+
+    def ignore_signal(self, signum, frame):
+        self._log_signal(signum)
 
     def exit_gracefully(self, signum, frame):
         self._log_signal(signum)
