@@ -169,23 +169,23 @@ Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
 
 class ServiceRegistrator:
 
-    def __init__(self, config):
-        self.config = config
-        log.info("Using IP: {}".format(config.options['ip']))
-        log.info("Using docker socket: {}".format(config.options['dockersock']))
+    def __init__(self, context):
+        self.context = context
+        log.info("Using IP: {}".format(context.options['ip']))
+        log.info("Using docker socket: {}".format(context.options['dockersock']))
         self._init_docker()
         self._init_consul()
-        self.containers = self.config.containers
+        self.containers = self.context.containers
 
     def _init_docker(self):
         self.docker_client = docker.from_env()
-        self.docker_api_client = docker.APIClient(base_url=self.config.options['dockersock'])
+        self.docker_api_client = docker.APIClient(base_url=self.context.options['dockersock'])
         self.events = self.docker_client.events(decode=True)
 
         def close_events():
             log.debug("close events")
             self.events.close()
-        self.config.register_on_exit(close_events)
+        self.context.register_on_exit(close_events)
 
     def _init_consul(self):
         pass
@@ -196,7 +196,7 @@ class ServiceRegistrator:
     def dump_events(self):
         # TODO: handle exceptions
         for event in self.listen_events():
-            if self.config.kill_now:
+            if self.context.kill_now:
                 break
             action = event['Action']
             etype = event['Type']
@@ -357,7 +357,7 @@ class ServiceRegistrator:
             return None
         name = container.name
         hostname = container.attrs['Config']['Hostname']
-        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname, self.config.options['ip'])
+        return ContainerInfo(cid, name, ports, metadata, metadata_with_port, hostname, self.context.options['ip'])
 
     def docker_running_containers(self):
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
@@ -379,7 +379,7 @@ class ServiceRegistrator:
                 log.debug("{} already in containers".format(cid))
 
 
-class Config:
+class Context:
     kill_now = False
     on_exit = list()
     signals = {
@@ -429,13 +429,12 @@ POSSIBLE_LEVELS = (
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
 def main(**options):
     """Register docker services into consul"""
-    config = Config(options)
+    context = Context(options)
 
-    while not config.kill_now:
+    while not context.kill_now:
         try:
             log.info("Starting...")
-            log.debug("debug")
-            serviceregistrator = ServiceRegistrator(config)
+            serviceregistrator = ServiceRegistrator(context)
             serviceregistrator.list_containers()
             serviceregistrator.dump_events()
         except docker.errors.DockerException as e:
@@ -450,8 +449,8 @@ def main(**options):
             log.error(traceback.format_exc())
             break
         finally:
-            if not config.kill_now:
-                delay = config.options['delay']
+            if not context.kill_now:
+                delay = context.options['delay']
                 log.debug("sleeping {} second(s)...".format(delay))
                 sleep(delay)
 
