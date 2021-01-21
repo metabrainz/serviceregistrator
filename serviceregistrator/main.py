@@ -18,14 +18,17 @@
 
 import signal
 from collections import defaultdict, namedtuple
+from consul import ConsulException
 from docker.models.containers import Container
 import click
+import consul
 import copy
 import docker
 import logging
 import traceback
 import re
 import sys
+from requests.exceptions import ConnectionError
 from time import sleep
 
 from serviceregistrator import ContainerMetadata
@@ -172,6 +175,11 @@ class ServiceRegistrator:
         self.context = context
         log.info("Using IP: {}".format(context.options['ip']))
         log.info("Using docker socket: {}".format(context.options['dockersock']))
+
+        self.consul_host = context.options['consul_host']
+        self.consul_port = context.options['consul_port']
+        log.info("Using Consul Agent at {}:{}".format(self.consul_host, self.consul_port))
+
         self._init_docker()
         self._init_consul()
         self.containers = self.context.containers
@@ -187,7 +195,15 @@ class ServiceRegistrator:
         self.context.register_on_exit(close_events)
 
     def _init_consul(self):
-        pass
+        self.consul_client = consul.Consul(host=self.consul_host, port=self.consul_port)
+
+        try:
+            peers = self.consul_client.status.peers()
+            log.info("Consul Agent has {} peers".format(len(peers)))
+        except ConnectionError:
+            log.error("Could not connect with Consul Agent.")
+        except ConsulException as e:
+            log.error("Consul issue: {}".format(e))
 
     def listen_events(self):
         yield from self.events
@@ -408,6 +424,7 @@ class ServiceRegistrator:
         except KeyError:
             pass
 
+
 class Context:
     kill_now = False
     on_exit = list()
@@ -473,6 +490,8 @@ POSSIBLE_LEVELS = (
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
 @click.option('-dg', '--debug', is_flag=True, help='Enables debug mode')
 @click.option('-sp', '--serviceid-prefix', default=None, help='service ID prefix (for testing purposes)')
+@click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
+@click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
