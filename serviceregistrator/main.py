@@ -16,6 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import signal
 from collections import namedtuple
 from docker.models.containers import Container
 import click
@@ -179,16 +180,24 @@ class ServiceRegistrator:
     def _init_docker(self):
         self.docker_client = docker.from_env()
         self.docker_api_client = docker.APIClient(base_url=self.config.options['dockersock'])
+        self.events = self.docker_client.events(decode=True)
+
+        def close_events():
+            log.debug("close events")
+            self.events.close()
+        self.config.register_on_exit(close_events)
 
     def _init_consul(self):
         pass
 
     def listen_events(self):
-        yield from self.docker_client.events(decode=True)
+        yield from self.events
 
     def dump_events(self):
         # TODO: handle exceptions
         for event in self.listen_events():
+            if self.config.kill_now:
+                break
             action = event['Action']
             etype = event['Type']
 
@@ -371,11 +380,29 @@ class ServiceRegistrator:
 
 
 class Config:
+    kill_now = False
+    on_exit = list()
+    signals = {
+        signal.SIGINT: 'SIGINT',
+        signal.SIGTERM: 'SIGTERM'
+    }
 
     def __init__(self, options):
         self.options = options
         configure_logging(options)
         self.containers = {}
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        log.info("Received {} signal".format(self.signals[signum]))
+        self.kill_now = True
+        for func in self.on_exit:
+            func()
+        log.info("Exiting gracefully...")
+
+    def register_on_exit(self, func):
+        self.on_exit.append(func)
 
 
 def loglevelfmt(ctx, param, value):
@@ -404,7 +431,7 @@ def main(**options):
     """Register docker services into consul"""
     config = Config(options)
 
-    while True:
+    while not config.kill_now:
         try:
             log.info("Starting...")
             log.debug("debug")
@@ -423,11 +450,10 @@ def main(**options):
             log.error(traceback.format_exc())
             break
         finally:
-            pass
-
-        delay = config.options['delay']
-        log.debug("sleeping {} second(s)...".format(delay))
-        sleep(delay)
+            if not config.kill_now:
+                delay = config.options['delay']
+                log.debug("sleeping {} second(s)...".format(delay))
+                sleep(delay)
 
 
 if __name__ == "__main__":
