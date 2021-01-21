@@ -192,7 +192,7 @@ class ServiceRegistrator:
         def close_events():
             log.debug("close events")
             self.events.close()
-        self.context.register_on_exit(close_events)
+        self.context.register_on_exit('close_events', close_events)
 
     def _init_consul(self):
         self.consul_client = consul.Consul(host=self.consul_host, port=self.consul_port)
@@ -427,7 +427,7 @@ class ServiceRegistrator:
 
 class Context:
     kill_now = False
-    on_exit = list()
+    on_exit = dict()
     _sig2name = None
 
     def __init__(self, options):
@@ -458,12 +458,12 @@ class Context:
     def exit_gracefully(self, signum, frame):
         self._log_signal(signum)
         self.kill_now = True
-        for func in self.on_exit:
+        for func in self.on_exit.values():
             func()
         log.info("Exiting gracefully...")
 
-    def register_on_exit(self, func):
-        self.on_exit.append(func)
+    def register_on_exit(self, name, func):
+        self.on_exit[name] = func
 
 
 def loglevelfmt(ctx, param, value):
