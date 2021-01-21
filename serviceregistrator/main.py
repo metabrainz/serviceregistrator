@@ -123,7 +123,7 @@ class ContainerInfo:
         containers[self.cid] = self
 
     def unregister(self, containers):
-        log.info('register {}'.format(self.name))
+        log.info('unregister {}'.format(self.name))
         try:
             del containers[self.cid]
             log.info('removing {} from containers'.format(self.name))
@@ -195,38 +195,49 @@ class ServiceRegistrator:
 
     def dump_events(self):
         # TODO: handle exceptions
+        def fmtevent(action, etype, cid):
+            return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
+
         for event in self.listen_events():
             if self.context.kill_now:
                 break
             action = event['Action']
             etype = event['Type']
+            cid = event['Actor']['ID']
 
             # with only listen for container events
             if etype != 'container':
+                if self.context.options['debug']:
+                    log.debug(fmtevent(action, etype, cid))
                 continue
 
             # Ignore health checks
             if action.startswith("exec_"):
+                if self.context.options['debug']:
+                    log.debug(fmtevent(action, etype, cid))
                 continue
 
             # Ignore image destroy (ecs does this regularly)
             if action == 'destroy':
+                if self.context.options['debug']:
+                    log.debug(fmtevent(action, etype, cid))
                 continue
 
-            cid = event['Actor']['ID']
-            log.info("Event [{}] type=[{}] cid=[{}]".format(
-                action, etype, cid))
+            log.info(fmtevent(action, etype, cid))
 
             container_info = self.parse_container_meta(cid)
             if not container_info:
+                if self.context.options['debug']:
+                    log.debug("skipping {} ...".format(cid))
                 continue
-            log.info(container_info)
 
             if cid in self.containers and action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
+                log.info(container_info)
                 container_info.unregister(self.containers)
                 continue
 
             if action in ('health_status: healthy', 'start'):
+                log.info(container_info)
                 container_info.register(self.containers)
                 continue
 
@@ -442,6 +453,7 @@ POSSIBLE_LEVELS = (
 @click.option('-ip', '--ip', required=True, help="ip to use for services")
 @click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
+@click.option('-dg', '--debug', is_flag=True, help='Enables debug mode')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
