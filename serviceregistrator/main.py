@@ -439,9 +439,9 @@ def main(**options):
             serviceregistrator.dump_events()
         except docker.errors.DockerException as e:
             log.error(e)
-        except Exception:
+        except Exception as e:
+            log.error(e)
             log.error(traceback.format_exc())
-            break
         finally:
             if not context.kill_now:
                 delay = context.options['delay']
