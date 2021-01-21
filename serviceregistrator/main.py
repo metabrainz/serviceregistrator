@@ -18,12 +18,13 @@
 
 import signal
 from collections import defaultdict, namedtuple
-from consul import ConsulException
+from consul import ConsulException, Check
 from docker.models.containers import Container
 import click
 import consul
 import copy
 import docker
+import json
 import logging
 import traceback
 import re
@@ -78,7 +79,7 @@ Container.health = health
 
 class Service:
 
-    def __init__(self, id_, name, ip, port, tags=None, attrs=None):
+    def __init__(self, container_id, id_, name, ip, port, tags=None, attrs=None):
         #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
         self.id = id_      # string               // unique service instance ID
         self.name = name   # string               // service name
@@ -88,6 +89,7 @@ class Service:
         self.tags = tags if not None else []
         #  map[string]string    // extra attribute metadata
         self.attrs = attrs if not None else dict()
+        self.container_id = container_id
 
     def __str__(self):
         return '==== Service id: {} ====\nname: {}\nip: {}\nport: {}\ntags: {}\nattrs: {}\n'.format(
@@ -95,7 +97,7 @@ class Service:
             self.port, self.tags, self.attrs)
 
     def __repr__(self):
-        return f"{type(self).__name__}('{self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs}')"
+        return f"{type(self).__name__}('{self.container_id}', {self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs}')"
 
 
 class ContainerInfo:
@@ -128,7 +130,7 @@ class ContainerInfo:
             else:
                 return None
 
-        # count services with same name or no name
+        # count services with same name or no name
         names_count = defaultdict(lambda: 0)
         for port in self.ports:
             name = getattr('name', port.internal)
@@ -156,8 +158,8 @@ class ContainerInfo:
             if self.serviceid_prefix:
                 service_id = "{}:{}".format(self.serviceid_prefix, service_id)
             service_ip = getattr('ip', port.internal) or self.serviceip
-            service = Service(service_id, service_name, service_ip,
-                              port.external, tags=service_tags, attrs=service_attrs)
+            service = Service(self.cid, service_id, service_name, service_ip,
+                              port.external, tags=list(set(service_tags)), attrs=service_attrs)
             services.append(service)
         return services
 
@@ -173,6 +175,7 @@ class ServiceRegistrator:
 
     def __init__(self, context):
         self.context = context
+        log.info(context.options)
         log.info("Using IP: {}".format(context.options['ip']))
         log.info("Using docker socket: {}".format(context.options['dockersock']))
 
@@ -378,7 +381,7 @@ class ServiceRegistrator:
             return None
         ports = self.extract_ports(container)
         if not ports:
-            # no exposed or published ports, skip
+            # no exposed or published ports, skip
             log.debug("skip container {} without exposed ports".format(cid))
             return None
         name = container.name
@@ -408,6 +411,197 @@ class ServiceRegistrator:
             else:
                 log.debug("{} already in containers".format(cid))
 
+    def make_check_http(self, service, params, proto='http'):
+        """
+        Consul HTTP Check
+
+        This feature is only available when using Consul 0.5 or newer.
+        Containers specifying these extra metadata in labels or environment will be used to register an HTTP health check with the service.
+
+        SERVICE_80_CHECK_HTTP=/health/endpoint/path
+        SERVICE_80_CHECK_INTERVAL=15s
+        SERVICE_80_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
+        SERVICE_80_CHECK_HTTP_METHOD=HEAD	# optional, Consul default used otherwise
+
+        It works for services on any port, not just 80. If its the only service, you can also use SERVICE_CHECK_HTTP.
+
+        Consul HTTPS Check
+
+        This feature is only available when using Consul 0.5 or newer.
+        Containers specifying these extra metedata in labels or environment will be used to register an HTTPS health check with the service.
+
+        SERVICE_443_CHECK_HTTPS=/health/endpoint/path
+        SERVICE_443_CHECK_INTERVAL=15s
+        SERVICE_443_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
+        SERVICE_443_CHECK_HTTPS_METHOD=HEAD	# optional, Consul default used otherwise
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L66
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-http-check
+        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L97
+        path = params.get(proto, '')
+        if path:
+            """
+            Perform a HTTP GET against *url* every *interval* (e.g. "10s") to perfom
+            health check with an optional *timeout* and optional *deregister* after
+            which a failing service will be automatically deregistered. Optional
+            parameter *header* specifies headers sent in HTTP request. *header*
+            paramater is in form of map of lists of strings,
+            e.g. {"x-foo": ["bar", "baz"]}.
+            """
+            url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
+            interval = params.get('interval', self.default_interval)
+            timeout = params.get('timeout', None)
+            deregister = params.get('deregister', None)
+            if deregister:
+                deregister = deregister.lower() == 'true'
+            header = params.get('header', None)
+            if header:
+                try:
+                    header = json.loads(header)
+                except Exception as e:
+                    log.error(e)
+                    header = None
+            return Check.http(url, interval, timeout=timeout, deregister=deregister, header=header)
+        return None
+
+    def make_check_tcp(self, service, params):
+        """
+        Consul TCP Check
+
+        This feature is only available when using Consul 0.6 or newer.
+        Containers specifying these extra metadata in labels or environment will be used to register an TCP health check with the service.
+
+        SERVICE_443_CHECK_TCP=true
+        SERVICE_443_CHECK_INTERVAL=15s
+        SERVICE_443_CHECK_TIMEOUT=3s		# optional, Consul default used otherwise
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L85
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
+        tcp = params.get('tcp', None)
+        if tcp.lower() == 'true':
+            """
+            Attempt to establish a tcp connection to the specified *host* and
+            *port* at a specified *interval* with optional *timeout* and optional
+            *deregister* after which a failing service will be automatically
+            deregistered.
+            """
+            host = service.ip
+            port = service.port
+            interval = params.get('interval', self.default_interval)
+            timeout = params.get('timeout', None)
+            deregister = params.get('deregister', None)
+            if deregister:
+                deregister = deregister.lower() == 'true'
+            return Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
+        return None
+
+    def make_check_ttl(self, service, params):
+        """
+        Consul TTL Check
+
+        You can also register a TTL check with Consul.
+        Keep in mind, this means Consul will expect a regular heartbeat ping to its API to keep the service marked healthy.
+
+        SERVICE_CHECK_TTL=30s
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L103
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-ttl-check
+        ttl = params.get('ttl', None)
+        if ttl:
+            """
+            Set check to be marked as critical after *ttl* (e.g. "10s") unless the
+            check
+            """
+            return Check.ttl(ttl)
+        return None
+
+    def make_check_script(self, service, params):
+        """
+        Consul Script Check
+
+        This feature is tricky because it lets you specify a script check to run from Consul. If running Consul in a container, you're limited to what you can run from that container. For example, curl must be installed for this to work:
+
+        SERVICE_CHECK_SCRIPT=curl --silent --fail example.com
+
+        The default interval for any non-TTL check is 10s, but you can set it with _CHECK_INTERVAL. The check command will be interpolated with the $SERVICE_IP and $SERVICE_PORT placeholders:
+
+        SERVICE_CHECK_SCRIPT=nc $SERVICE_IP $SERVICE_PORT | grep OK
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L53
+        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L115
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-script-check
+        args = params.get('script', None)
+        if args:
+            """
+            Run the script *args* every *interval* (e.g. "10s") to perfom health check
+            """
+            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            interval = params.get('interval', self.default_interval)
+            deregister = params.get('deregister', None)
+            if deregister:
+                deregister = deregister.lower() == 'true'
+            return Check.script(args, interval, deregister=deregister)
+        return None
+
+    def make_check_docker(self, service, params):
+        """
+        Consul Docker Check
+
+         SERVICE_CHECK_DOCKER=curl --silent --fail example.com
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L111
+        script = params.get('docker', None)
+        if script:
+            """
+            Invoke *script* packaged within a running docker container with
+            *container_id* at a specified *interval* on the configured
+            *shell* using the Docker Exec API.  Optional *register* after which a
+            failing service will be automatically deregistered.
+            """
+            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            container_id = service.container_id[:12]
+            shell = params.get('shell', '/bin/sh')
+            interval = params.get('interval', self.default_interval)
+            deregister = params.get('deregister', None)
+            if deregister:
+                deregister = deregister.lower() == 'true'
+            return Check.docker(container_id, shell, script, interval, deregister=deregister)
+        return None
+
+    def make_check(self, service):
+        self.default_interval = '10s'
+        params = {}
+        for key, value in service.attrs.items():
+            if key.startswith('check_'):
+                k = key[6:]
+                params[k] = value
+        log.debug(params)
+        if 'http' in params:
+            return self.make_check_http(service, params, proto='http')
+        if 'https' in params:
+            return self.make_check_http(service, params, proto='https')
+        if 'tcp' in params:
+            return self.make_check_tcp(service, params)
+        if 'script' in params:
+            return self.make_check_script(service, params)
+        if 'docker' in params:
+            return self.make_check_docker(service, params)
+        return None
+
+    def register_services(self, container_info):
+        for service in container_info.services:
+            try:
+                self.consul_client.agent.service.register(
+                    name=service.name,
+                    service_id=service.id,
+                    address=service.ip,
+                    port=service.port,
+                    tags=service.tags,
+                    check=self.make_check(service)
+                )
+            except Exception as e:
+                log.error(e)
+
     def register(self, container_info):
         log.info('register {}'.format(container_info.name))
         if container_info.cid in self.containers:
@@ -415,6 +609,7 @@ class ServiceRegistrator:
         else:
             log.info('adding {} to containers'.format(container_info.name))
         self.containers[container_info.cid] = container_info
+        self.register_services(container_info)
 
     def unregister(self, container_info):
         log.info('unregister {}'.format(container_info.name))

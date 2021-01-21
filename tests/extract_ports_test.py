@@ -40,4 +40,4 @@ class TestExtractPorts(unittest.TestCase):
         ports = ServiceRegistrator.extract_ports(self.container)
         self.assertEqual(set(ports), set([
             Ports(internal=80, external=80, protocol='tcp', ip='0.0.0.0'),
-            Ports(internal=180, external=180, protocol='udp', ip='0.0.0.0'),]))
+            Ports(internal=180, external=180, protocol='udp', ip='0.0.0.0'), ]))
