@@ -382,20 +382,28 @@ class ServiceRegistrator:
 class Context:
     kill_now = False
     on_exit = list()
-    signals = {
-        signal.SIGINT: 'SIGINT',
-        signal.SIGTERM: 'SIGTERM'
-    }
+    _sig2name = None
 
     def __init__(self, options):
         self.options = options
         configure_logging(options)
         self.containers = {}
+
+        # exit signals
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
+    def _log_signal(self, signum):
+        if self._sig2name is None:
+            # extract signal names from signal module
+            # signal.Signals is an enum
+            self._sig2name = dict([(s.value, s.name) for s in signal.Signals])
+
+        name = self._sig2name.get(signum, signum)
+        log.info("Received {} signal".format(name))
+
     def exit_gracefully(self, signum, frame):
-        log.info("Received {} signal".format(self.signals[signum]))
+        self._log_signal(signum)
         self.kill_now = True
         for func in self.on_exit:
             func()
