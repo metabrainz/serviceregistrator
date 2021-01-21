@@ -597,6 +597,7 @@ class ServiceRegistrator:
                     address=service.ip,
                     port=service.port,
                     tags=service.tags,
+                    meta=service.attrs,
                     check=self.make_check(service)
                 )
             except Exception as e:
