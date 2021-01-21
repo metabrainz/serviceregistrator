@@ -17,7 +17,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import signal
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from docker.models.containers import Container
 import click
 import copy
@@ -139,20 +139,32 @@ class ContainerInfo:
                 return self.metadata[key]
             else:
                 return None
+
+        # count services with same name or no name
+        names_count = defaultdict(lambda: 0)
+        for port in self.ports:
+            name = getattr('name', port.internal)
+            if name:
+                names_count[name] += 1
+
         services = list()
         for port in self.ports:
-            service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
-            service_port = port.external
             service_name = getattr('name', port.internal)
-            if not service_name:
+            count = names_count[service_name]
+            if count < 1:
                 log.debug("Skipping port {}, no service name set".format(port))
                 continue
+            elif count > 1:
+                service_name = '{}-{}'.format(service_name, port.external)
+                if port.protocol != 'tcp':
+                    service_name = '{}-{}'.format(service_name, port.protocol)
+
             service_tags = getattr('tags', port.internal) or []
             service_attrs = getattr('attrs', port.internal) or {}
             service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
             if port.protocol != 'tcp':
-                service_id += ":udp"
-                service_tags.append('udp')
+                service_id += ":" + port.protocol
+                service_tags.append(port.protocol)
             service_ip = getattr('ip', port.internal) or self.serviceip
             service = Service(service_id, service_name, service_ip,
                               port.external, tags=service_tags, attrs=service_attrs)
