@@ -115,22 +115,6 @@ class ContainerInfo:
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
 
-    def register(self, containers):
-        log.info('register {}'.format(self.name))
-        if self.cid in containers:
-            log.info('updating {} containers'.format(self.name))
-        else:
-            log.info('adding {} to containers'.format(self.name))
-        containers[self.cid] = self
-
-    def unregister(self, containers):
-        log.info('unregister {}'.format(self.name))
-        try:
-            del containers[self.cid]
-            log.info('removing {} from containers'.format(self.name))
-        except KeyError:
-            pass
-
     @property
     def services(self):
         def getattr(key, port):
@@ -248,12 +232,12 @@ class ServiceRegistrator:
 
             if cid in self.containers and action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
                 log.info(container_info)
-                container_info.unregister(self.containers)
+                self.unregister(container_info)
                 continue
 
             if action in ('health_status: healthy', 'start'):
                 log.info(container_info)
-                container_info.register(self.containers)
+                self.register(container_info)
                 continue
 
     def docker_get_container_by_id(self, cid):
@@ -399,8 +383,8 @@ class ServiceRegistrator:
                 container.reload()  # needed since we use sparse, and want health
                 container_info = self.parse_container_meta(cid)
                 if container_info:
-                    container_info.register(self.containers)
                     log.info(container_info)
+                    self.register(container_info)
                 elif container_info is not None:
                     log.debug("Skipping {}".format(container_info))
                 else:
@@ -408,6 +392,21 @@ class ServiceRegistrator:
             else:
                 log.debug("{} already in containers".format(cid))
 
+    def register(self, container_info):
+        log.info('register {}'.format(container_info.name))
+        if container_info.cid in self.containers:
+            log.info('updating {} containers'.format(container_info.name))
+        else:
+            log.info('adding {} to containers'.format(container_info.name))
+        self.containers[container_info.cid] = container_info
+
+    def unregister(self, container_info):
+        log.info('unregister {}'.format(container_info.name))
+        try:
+            del self.containers[container_info.cid]
+            log.info('removing {} from containers'.format(container_info.name))
+        except KeyError:
+            pass
 
 class Context:
     kill_now = False
