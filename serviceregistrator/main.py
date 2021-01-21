@@ -439,12 +439,6 @@ def main(**options):
             serviceregistrator.dump_events()
         except docker.errors.DockerException as e:
             log.error(e)
-        except KeyboardInterrupt:
-            log.info("KeyboardInterrupt... exiting gracefully")
-            break
-        except SystemExit:
-            log.info("SystemExit... exiting gracefully")
-            break
         except Exception:
             log.error(traceback.format_exc())
             break
