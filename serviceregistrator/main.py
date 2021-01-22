@@ -594,20 +594,24 @@ class ServiceRegistrator:
             return self.make_check_docker(service, params)
         return None
 
+    def consul_register_service(self, service):
+        log.debug("consul register service {}".format(service.id))
+        try:
+            self.consul_client.agent.service.register(
+                name=service.name,
+                service_id=service.id,
+                address=service.ip,
+                port=service.port,
+                tags=service.tags,
+                meta=service.attrs,
+                check=self.make_check(service)
+            )
+        except Exception as e:
+            log.error(e)
+
     def register_services(self, container_info):
         for service in container_info.services:
-            try:
-                self.consul_client.agent.service.register(
-                    name=service.name,
-                    service_id=service.id,
-                    address=service.ip,
-                    port=service.port,
-                    tags=service.tags,
-                    meta=service.attrs,
-                    check=self.make_check(service)
-                )
-            except Exception as e:
-                log.error(e)
+            self.consul_register_service(service)
 
     def register(self, container_info):
         log.info('register {}'.format(container_info.name))
