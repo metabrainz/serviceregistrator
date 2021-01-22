@@ -581,7 +581,6 @@ class ServiceRegistrator:
             if key.startswith('check_'):
                 k = key[6:]
                 params[k] = value
-        log.debug(params)
         if 'http' in params:
             return self.make_check_http(service, params, proto='http')
         if 'https' in params:
@@ -626,10 +625,6 @@ class ServiceRegistrator:
 
     def register(self, container_info):
         log.info('register {}'.format(container_info.name))
-        if container_info.cid in self.containers:
-            log.info('updating {} containers'.format(container_info.name))
-        else:
-            log.info('adding {} to containers'.format(container_info.name))
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
