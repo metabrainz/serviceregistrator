@@ -270,7 +270,7 @@ class ServiceCheck:
             """
             Run the script *args* every *interval* (e.g. "10s") to perfom health check
             """
-            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             interval, deregister = cls._common_values(params)
             return Check.script(args, interval, deregister=deregister)
         return None
@@ -291,7 +291,7 @@ class ServiceCheck:
             *shell* using the Docker Exec API.  Optional *register* after which a
             failing service will be automatically deregistered.
             """
-            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             container_id = service.container_id[:12]
             shell = cls._value(params, 'shell')
             interval, deregister = cls._common_values(params)
