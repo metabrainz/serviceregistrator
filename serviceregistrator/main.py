@@ -101,6 +101,190 @@ class Service:
         return f"{type(self).__name__}('{self.container_id}', {self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs}')"
 
 
+class ServiceCheck:
+    defaults = {
+        'deregister': None,
+        'docker': None,
+        'header': None,
+        'http': '',
+        'https': '',
+        'interval': '10s',
+        'shell': '/bin/sh',
+        'script': None,
+        'tcp': None,
+        'timeout': None,
+        'ttl': None,
+    }
+
+    @classmethod
+    def _value(cls, params, key):
+        return params.get(key, cls.defaults.get(key))
+
+    @classmethod
+    def _common_values(cls, params):
+        interval = cls._value(params, 'interval')
+        deregister = cls._value(params, 'deregister')
+        if deregister:
+            deregister = deregister.lower() == 'true'
+        return interval, deregister
+
+    @classmethod
+    def _http(cls, service, params, proto='http'):
+        """
+        Consul HTTP Check
+
+        This feature is only available when using Consul 0.5 or newer.
+        Containers specifying these extra metadata in labels or environment will be used to register an HTTP health check with the service.
+
+        SERVICE_80_CHECK_HTTP=/health/endpoint/path
+        SERVICE_80_CHECK_INTERVAL=15s
+        SERVICE_80_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
+
+        It works for services on any port, not just 80. If its the only service, you can also use SERVICE_CHECK_HTTP.
+
+        Consul HTTPS Check
+
+        This feature is only available when using Consul 0.5 or newer.
+        Containers specifying these extra metedata in labels or environment will be used to register an HTTPS health check with the service.
+
+        SERVICE_443_CHECK_HTTPS=/health/endpoint/path
+        SERVICE_443_CHECK_INTERVAL=15s
+        SERVICE_443_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L66
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-http-check
+        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L97
+        path = cls._value(params, proto)
+        if path:
+            """
+            Perform a HTTP GET against *url* every *interval* (e.g. "10s") to perfom
+            health check with an optional *timeout* and optional *deregister* after
+            which a failing service will be automatically deregistered. Optional
+            parameter *header* specifies headers sent in HTTP request. *header*
+            paramater is in form of map of lists of strings,
+            e.g. {"x-foo": ["bar", "baz"]}.
+            """
+            url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
+            timeout = cls._value(params, 'timeout')
+            interval, deregister = cls._common_values(params)
+            header = cls._value(params, 'header')
+            if header:
+                try:
+                    header = json.loads(header)
+                except Exception as e:
+                    log.error(e)
+                    header = None
+            return Check.http(url, interval, timeout=timeout, deregister=deregister, header=header)
+        return None
+
+    @classmethod
+    def http(cls, service, params):
+        return cls._http(service, params, proto='http')
+
+    @classmethod
+    def https(cls, service, params):
+        return cls._http(service, params, proto='https')
+
+    @classmethod
+    def tcp(cls, service, params):
+        """
+        Consul TCP Check
+
+        This feature is only available when using Consul 0.6 or newer.
+        Containers specifying these extra metadata in labels or environment will be used to register an TCP health check with the service.
+
+        SERVICE_443_CHECK_TCP=true
+        SERVICE_443_CHECK_INTERVAL=15s
+        SERVICE_443_CHECK_TIMEOUT=3s		# optional, Consul default used otherwise
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L85
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
+        tcp = cls._value(params, 'tcp')
+        if tcp.lower() == 'true':
+            """
+            Attempt to establish a tcp connection to the specified *host* and
+            *port* at a specified *interval* with optional *timeout* and optional
+            *deregister* after which a failing service will be automatically
+            deregistered.
+            """
+            host = service.ip
+            port = service.port
+            interval, deregister = cls._common_values(params)
+            timeout = cls._value(params, 'timeout')
+            return Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
+        return None
+
+    @classmethod
+    def ttl(cls, service, params):
+        """
+        Consul TTL Check
+
+        You can also register a TTL check with Consul.
+        Keep in mind, this means Consul will expect a regular heartbeat ping to its API to keep the service marked healthy.
+
+        SERVICE_CHECK_TTL=30s
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L103
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-ttl-check
+        ttl = cls._value(params, 'ttl')
+        if ttl:
+            """
+            Set check to be marked as critical after *ttl* (e.g. "10s") unless the
+            check
+            """
+            return Check.ttl(ttl)
+        return None
+
+    @classmethod
+    def script(cls, service, params):
+        """
+        Consul Script Check
+
+        This feature is tricky because it lets you specify a script check to run from Consul. If running Consul in a container, you're limited to what you can run from that container. For example, curl must be installed for this to work:
+
+        SERVICE_CHECK_SCRIPT=curl --silent --fail example.com
+
+        The default interval for any non-TTL check is 10s, but you can set it with _CHECK_INTERVAL. The check command will be interpolated with the $SERVICE_IP and $SERVICE_PORT placeholders:
+
+        SERVICE_CHECK_SCRIPT=nc $SERVICE_IP $SERVICE_PORT | grep OK
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L53
+        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L115
+        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-script-check
+        args = cls._value(params, 'script')
+        if args:
+            """
+            Run the script *args* every *interval* (e.g. "10s") to perfom health check
+            """
+            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            interval, deregister = cls._common_values(params)
+            return Check.script(args, interval, deregister=deregister)
+        return None
+
+    @classmethod
+    def docker(cls, service, params):
+        """
+        Consul Docker Check
+
+         SERVICE_CHECK_DOCKER=curl --silent --fail example.com
+        """
+        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L111
+        script = cls._value(params, 'docker')
+        if script:
+            """
+            Invoke *script* packaged within a running docker container with
+            *container_id* at a specified *interval* on the configured
+            *shell* using the Docker Exec API.  Optional *register* after which a
+            failing service will be automatically deregistered.
+            """
+            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
+            container_id = service.container_id[:12]
+            shell = cls._value(params, 'shell')
+            interval, deregister = cls._common_values(params)
+            return Check.docker(container_id, shell, script, interval, deregister=deregister)
+        return None
+
+
 class ContainerInfo:
     def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
         self.cid = cid
@@ -430,180 +614,32 @@ class ServiceRegistrator:
             else:
                 log.debug("{} already in containers".format(cid))
 
-    def make_check_http(self, service, params, proto='http'):
-        """
-        Consul HTTP Check
-
-        This feature is only available when using Consul 0.5 or newer.
-        Containers specifying these extra metadata in labels or environment will be used to register an HTTP health check with the service.
-
-        SERVICE_80_CHECK_HTTP=/health/endpoint/path
-        SERVICE_80_CHECK_INTERVAL=15s
-        SERVICE_80_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
-        SERVICE_80_CHECK_HTTP_METHOD=HEAD	# optional, Consul default used otherwise
-
-        It works for services on any port, not just 80. If its the only service, you can also use SERVICE_CHECK_HTTP.
-
-        Consul HTTPS Check
-
-        This feature is only available when using Consul 0.5 or newer.
-        Containers specifying these extra metedata in labels or environment will be used to register an HTTPS health check with the service.
-
-        SERVICE_443_CHECK_HTTPS=/health/endpoint/path
-        SERVICE_443_CHECK_INTERVAL=15s
-        SERVICE_443_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
-        SERVICE_443_CHECK_HTTPS_METHOD=HEAD	# optional, Consul default used otherwise
-        """
-        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L66
-        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-http-check
-        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L97
-        path = params.get(proto, '')
-        if path:
-            """
-            Perform a HTTP GET against *url* every *interval* (e.g. "10s") to perfom
-            health check with an optional *timeout* and optional *deregister* after
-            which a failing service will be automatically deregistered. Optional
-            parameter *header* specifies headers sent in HTTP request. *header*
-            paramater is in form of map of lists of strings,
-            e.g. {"x-foo": ["bar", "baz"]}.
-            """
-            url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
-            interval = params.get('interval', self.default_interval)
-            timeout = params.get('timeout', None)
-            deregister = params.get('deregister', None)
-            if deregister:
-                deregister = deregister.lower() == 'true'
-            header = params.get('header', None)
-            if header:
-                try:
-                    header = json.loads(header)
-                except Exception as e:
-                    log.error(e)
-                    header = None
-            return Check.http(url, interval, timeout=timeout, deregister=deregister, header=header)
-        return None
-
-    def make_check_tcp(self, service, params):
-        """
-        Consul TCP Check
-
-        This feature is only available when using Consul 0.6 or newer.
-        Containers specifying these extra metadata in labels or environment will be used to register an TCP health check with the service.
-
-        SERVICE_443_CHECK_TCP=true
-        SERVICE_443_CHECK_INTERVAL=15s
-        SERVICE_443_CHECK_TIMEOUT=3s		# optional, Consul default used otherwise
-        """
-        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L85
-        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
-        tcp = params.get('tcp', None)
-        if tcp.lower() == 'true':
-            """
-            Attempt to establish a tcp connection to the specified *host* and
-            *port* at a specified *interval* with optional *timeout* and optional
-            *deregister* after which a failing service will be automatically
-            deregistered.
-            """
-            host = service.ip
-            port = service.port
-            interval = params.get('interval', self.default_interval)
-            timeout = params.get('timeout', None)
-            deregister = params.get('deregister', None)
-            if deregister:
-                deregister = deregister.lower() == 'true'
-            return Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
-        return None
-
-    def make_check_ttl(self, service, params):
-        """
-        Consul TTL Check
-
-        You can also register a TTL check with Consul.
-        Keep in mind, this means Consul will expect a regular heartbeat ping to its API to keep the service marked healthy.
-
-        SERVICE_CHECK_TTL=30s
-        """
-        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L103
-        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-ttl-check
-        ttl = params.get('ttl', None)
-        if ttl:
-            """
-            Set check to be marked as critical after *ttl* (e.g. "10s") unless the
-            check
-            """
-            return Check.ttl(ttl)
-        return None
-
-    def make_check_script(self, service, params):
-        """
-        Consul Script Check
-
-        This feature is tricky because it lets you specify a script check to run from Consul. If running Consul in a container, you're limited to what you can run from that container. For example, curl must be installed for this to work:
-
-        SERVICE_CHECK_SCRIPT=curl --silent --fail example.com
-
-        The default interval for any non-TTL check is 10s, but you can set it with _CHECK_INTERVAL. The check command will be interpolated with the $SERVICE_IP and $SERVICE_PORT placeholders:
-
-        SERVICE_CHECK_SCRIPT=nc $SERVICE_IP $SERVICE_PORT | grep OK
-        """
-        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L53
-        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L115
-        # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-script-check
-        args = params.get('script', None)
-        if args:
-            """
-            Run the script *args* every *interval* (e.g. "10s") to perfom health check
-            """
-            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
-            interval = params.get('interval', self.default_interval)
-            deregister = params.get('deregister', None)
-            if deregister:
-                deregister = deregister.lower() == 'true'
-            return Check.script(args, interval, deregister=deregister)
-        return None
-
-    def make_check_docker(self, service, params):
-        """
-        Consul Docker Check
-
-         SERVICE_CHECK_DOCKER=curl --silent --fail example.com
-        """
-        # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L111
-        script = params.get('docker', None)
-        if script:
-            """
-            Invoke *script* packaged within a running docker container with
-            *container_id* at a specified *interval* on the configured
-            *shell* using the Docker Exec API.  Optional *register* after which a
-            failing service will be automatically deregistered.
-            """
-            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', service.port)
-            container_id = service.container_id[:12]
-            shell = params.get('shell', '/bin/sh')
-            interval = params.get('interval', self.default_interval)
-            deregister = params.get('deregister', None)
-            if deregister:
-                deregister = deregister.lower() == 'true'
-            return Check.docker(container_id, shell, script, interval, deregister=deregister)
-        return None
-
     def make_check(self, service):
-        self.default_interval = '10s'
+        checks = {
+            'docker': ServiceCheck.docker,
+            'http': ServiceCheck.http,
+            'https': ServiceCheck.https,
+            'script': ServiceCheck.script,
+            'tcp': ServiceCheck.tcp,
+            'ttl': ServiceCheck.ttl,
+        }
+        valid_checks = set(checks)
+        check = None
         params = {}
         for key, value in service.attrs.items():
             if key.startswith('check_'):
                 k = key[6:]
                 params[k] = value
-        if 'http' in params:
-            return self.make_check_http(service, params, proto='http')
-        if 'https' in params:
-            return self.make_check_http(service, params, proto='https')
-        if 'tcp' in params:
-            return self.make_check_tcp(service, params)
-        if 'script' in params:
-            return self.make_check_script(service, params)
-        if 'docker' in params:
-            return self.make_check_docker(service, params)
+                if check is None and k in valid_checks:
+                    check = k
+        if check:
+            try:
+                ret = checks[check](service, params)
+                if ret:
+                    log.debug("{}: setting check {}: {}".format(service.id, check, ret))
+            except Exception as e:
+                log.error("{}: setting check {}: {}".format(service.id, check, e))
+                log.error(traceback.format_exc())
         return None
 
     @staticmethod
