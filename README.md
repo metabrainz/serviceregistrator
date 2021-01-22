@@ -37,4 +37,4 @@ serviceregistrator
 ## References
 
 - https://docker-py.readthedocs.io/en/stable/
-- https://python-consul.readthedocs.io/en/latest/
+- https://python-consul2.readthedocs.io/en/latest/
