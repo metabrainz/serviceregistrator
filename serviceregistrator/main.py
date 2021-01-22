@@ -666,27 +666,23 @@ class ServiceRegistrator:
     def is_our_identifier(self, serviceid, prefix=''):
         identifier = serviceid.split(':')
         length = len(identifier)
-        if length < 4:
-            return False
         if prefix:
             if identifier[0] != prefix:
-                return False
+                return False, "different prefix"
             else:
                 identifier = identifier[1:]
                 length -= 1
-        if length > 4:
-            return False
-        if length == 4:
+        if length < 3:
+            return False, "length < 3"
+        if length > 3:
             if identifier[-1] != 'udp':
-                return False
+                return False, "no udp"
             else:
                 identifier = identifier[:-1]
                 length -= 1
-        if length != 3:
-            return False
         if identifier[0] != self.hostname:
-            return False
-        return True
+            return False, "different hostname"
+        return True, None
 
     def containers_service_identifiers(self):
         services = []
@@ -707,8 +703,9 @@ class ServiceRegistrator:
         our_services = self.containers_service_identifiers()
         prefix = self.context.options['service_prefix']
         for serviceid in registered_services:
-            if not self.is_our_identifier(serviceid, prefix):
-                log.debug("cleanup: skipping {}, not ours".format(serviceid))
+            is_ours, comment = self.is_our_identifier(serviceid, prefix)
+            if not is_ours:
+                log.debug("cleanup: skipping {}, not ours ({})".format(serviceid, comment))
                 continue
             if serviceid not in our_services:
                 self.consul_unregister_service(serviceid)
