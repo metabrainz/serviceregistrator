@@ -642,24 +642,24 @@ class ServiceRegistrator:
 
     def is_our_identifier(self, serviceid, prefix=''):
         identifier = serviceid.split(':')
-        l = len(identifier)
-        if l < 4:
+        length = len(identifier)
+        if length < 4:
             return False
         if prefix:
             if identifier[0] != prefix:
                 return False
             else:
                 identifier = identifier[1:]
-                l -= 1
-        if l > 4:
+                length -= 1
+        if length > 4:
             return False
-        if l == 4:
+        if length == 4:
             if identifier[-1] != 'udp':
                 return False
             else:
                 identifier = identifier[:-1]
-                l -= 1
-        if l != 3:
+                length -= 1
+        if length != 3:
             return False
         if identifier[0] != self.hostname:
             return False
