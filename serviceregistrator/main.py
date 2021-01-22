@@ -113,6 +113,7 @@ class ServiceCheck:
         'script': None,
         'tcp': None,
         'timeout': None,
+        'tls_skip_verify': None,
         'ttl': None,
     }
 
@@ -154,6 +155,8 @@ class ServiceCheck:
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L66
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-http-check
         # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L97
+        # https://github.com/poppyred/python-consul2/blob/b1057552427ccad11c03f7d60743336f77d0f7ea/consul/base.py#L66
+        # https://www.consul.io/docs/discovery/checks#http-interval
         path = cls._value(params, proto)
         if path:
             """
@@ -168,13 +171,15 @@ class ServiceCheck:
             timeout = cls._value(params, 'timeout')
             interval, deregister = cls._common_values(params)
             header = cls._value(params, 'header')
+            tls_skip_verify = cls._value(params, 'tls_skip_verify')
             if header:
                 try:
                     header = json.loads(header)
                 except Exception as e:
                     log.error(e)
                     header = None
-            return Check.http(url, interval, timeout=timeout, deregister=deregister, header=header)
+            return Check.http(url, interval, timeout=timeout, deregister=deregister,
+                              header=header, tls_skip_verify=tls_skip_verify)
         return None
 
     @classmethod
