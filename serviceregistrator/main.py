@@ -614,7 +614,7 @@ class ServiceRegistrator:
                 # ignore SERVICE_CHECK_*
                 continue
             if k == 'ip':
-                # ignore SERVICE_IP
+                # ignore SERVICE_IP
                 continue
             meta[k] = v
         return meta
