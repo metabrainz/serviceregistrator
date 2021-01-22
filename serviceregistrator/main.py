@@ -651,6 +651,7 @@ class ServiceRegistrator:
                 ret = checks[check](service, params)
                 if ret:
                     log.debug("{}: setting check {}: {}".format(service.id, check, ret))
+                return ret
             except Exception as e:
                 log.error("{}: setting check {}: {}".format(service.id, check, e))
                 log.error(traceback.format_exc())
