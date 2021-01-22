@@ -29,3 +29,31 @@ function runservice() {
 
 runservice 8081
 runservice 8082
+
+
+NAME="dummyservice_checktcp"
+INTPORT=80
+EXTPORT=8083
+docker rm -f "$NAME"
+docker run -d \
+	--env "SERVICE_${INTPORT}_CHECK_TCP=true" \
+	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+	--env "SERVICE_${INTPORT}_NAME=$NAME" \
+	--hostname "$HOSTNAME" \
+	--name "$NAME" \
+	--publish "${EXTPORT}:${INTPORT}" \
+	dummyservice
+
+
+NAME="dummyservice_checkhttp"
+INTPORT=80
+EXTPORT=8084
+docker rm -f "$NAME"
+docker run -d \
+	--env "SERVICE_${INTPORT}_CHECK_HTTP=/" \
+	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+	--env "SERVICE_${INTPORT}_NAME=$NAME" \
+	--hostname "$HOSTNAME" \
+	--name "$NAME" \
+	--publish "${EXTPORT}:${INTPORT}" \
+	dummyservice
