@@ -49,11 +49,13 @@ NAME="dummyservice_checkhttp"
 INTPORT=80
 EXTPORT=8084
 docker rm -f "$NAME"
+HEADER='{"x-foo": ["bar", "baz"]}'
 docker run -d \
 	--env "SERVICE_${INTPORT}_CHECK_HTTP=/" \
 	--env "SERVICE_${INTPORT}_CHECK_HTTP_METHOD=HEAD" \
 	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
 	--env "SERVICE_${INTPORT}_CHECK_INTERVAL=5s" \
+	--env "SERVICE_${INTPORT}_CHECK_HEADER=$HEADER" \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
 	--hostname "$HOSTNAME" \
 	--name "$NAME" \
