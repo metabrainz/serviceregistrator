@@ -271,8 +271,8 @@ class ServiceCheck:
             Run the script *args* every *interval* (e.g. "10s") to perfom health check
             """
             args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
-            interval, deregister = cls._common_values(params)
-            return Check.script(args, interval, deregister=deregister)
+            interval = cls._value(params, 'interval')
+            return Check.script(args.split(' '), interval)
         return None
 
     @classmethod
