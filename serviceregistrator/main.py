@@ -110,7 +110,7 @@ class ContainerInfo:
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
         self.serviceip = serviceip
-        self.serviceid_prefix = None
+        self.service_prefix = None
         self._services = None
         self.tags = tags
 
@@ -136,16 +136,22 @@ class ContainerInfo:
             else:
                 return None
 
+        def get_name(port):
+            name = getattr('name', port.internal)
+            if name and self.service_prefix:
+                return self.service_prefix + ':' + name
+            return name
+
         # count services with same name or no name
         names_count = defaultdict(lambda: 0)
         for port in self.ports:
-            name = getattr('name', port.internal)
+            name = get_name(port)
             if name:
                 names_count[name] += 1
 
         services = list()
         for port in self.ports:
-            service_name = getattr('name', port.internal)
+            service_name = get_name(port)
             count = names_count[service_name]
             if count < 1:
                 log.debug("Skipping port {}, no service name set".format(port))
@@ -163,8 +169,8 @@ class ContainerInfo:
             if port.protocol != 'tcp':
                 service_id += ":" + port.protocol
                 service_tags.append(port.protocol)
-            if self.serviceid_prefix:
-                service_id = "{}:{}".format(self.serviceid_prefix, service_id)
+            if self.service_prefix:
+                service_id = "{}:{}".format(self.service_prefix, service_id)
             service_ip = getattr('ip', port.internal) or self.serviceip
             service = Service(self.cid, service_id, service_name, service_ip,
                               port.external, tags=list(set(service_tags)), attrs=service_attrs)
@@ -401,8 +407,8 @@ class ServiceRegistrator:
         tags = self.context.options['tags'].split(',')
         container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
                                        self.hostname, self.context.options['ip'], tags)
-        if self.context.options['serviceid_prefix']:
-            container_info.serviceid_prefix = self.context.options['serviceid_prefix']
+        if self.context.options['service_prefix']:
+            container_info.service_prefix = self.context.options['service_prefix']
         return container_info
 
     def docker_running_containers(self):
@@ -699,7 +705,7 @@ class ServiceRegistrator:
         log.debug("cleanup")
         registered_services = self.consul_services()
         our_services = self.containers_service_identifiers()
-        prefix = self.context.options['serviceid_prefix']
+        prefix = self.context.options['service_prefix']
         for serviceid in registered_services:
             if not self.is_our_identifier(serviceid, prefix):
                 log.debug("cleanup: skipping {}, not ours".format(serviceid))
@@ -772,7 +778,7 @@ POSSIBLE_LEVELS = (
 @click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
 @click.option('-dg', '--debug', is_flag=True, help='Enables debug mode')
-@click.option('-sp', '--serviceid-prefix', default=None, help='service ID prefix (for testing purposes)')
+@click.option('-sp', '--service-prefix', default=None, help='service ID/name prefix (for testing purposes)')
 @click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
 @click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
 @click.option('-t', '--tags', default='', help='comma-separated list of tags to append to all registered services')
