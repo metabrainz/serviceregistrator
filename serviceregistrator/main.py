@@ -28,6 +28,7 @@ import json
 import logging
 import traceback
 import re
+import socket
 import sys
 from requests.exceptions import ConnectionError
 from time import sleep
@@ -180,6 +181,7 @@ class ServiceRegistrator:
 
     def __init__(self, context):
         self.context = context
+        self.hostname = socket.gethostname()
         log.info(context.options)
         log.info("Using IP: {}".format(context.options['ip']))
         log.info("Using docker socket: {}".format(context.options['dockersock']))
@@ -390,9 +392,8 @@ class ServiceRegistrator:
             log.debug("skip container {} without exposed ports".format(cid))
             return None
         name = container.name
-        hostname = container.attrs['Config']['Hostname']
         container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
-                                       hostname, self.context.options['ip'])
+                                       self.hostname, self.context.options['ip'])
         if self.context.options['serviceid_prefix']:
             container_info.serviceid_prefix = self.context.options['serviceid_prefix']
         return container_info
