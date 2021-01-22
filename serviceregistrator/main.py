@@ -102,7 +102,7 @@ class Service:
 
 
 class ContainerInfo:
-    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip):
+    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
         self.cid = cid
         self.name = name
         self.ports = ports
@@ -112,6 +112,7 @@ class ContainerInfo:
         self.serviceip = serviceip
         self.serviceid_prefix = None
         self._services = None
+        self.tags = tags
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\nservices: \n{}\n'.format(
@@ -155,6 +156,8 @@ class ContainerInfo:
                     service_name = '{}-{}'.format(service_name, port.protocol)
 
             service_tags = getattr('tags', port.internal) or []
+            if self.tags:
+                service_tags.extend(self.tags)
             service_attrs = getattr('attrs', port.internal) or {}
             service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
             if port.protocol != 'tcp':
@@ -395,8 +398,9 @@ class ServiceRegistrator:
             log.debug("skip container {} without exposed ports".format(cid))
             return None
         name = container.name
+        tags = self.context.options['tags'].split(',')
         container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
-                                       self.hostname, self.context.options['ip'])
+                                       self.hostname, self.context.options['ip'], tags)
         if self.context.options['serviceid_prefix']:
             container_info.serviceid_prefix = self.context.options['serviceid_prefix']
         return container_info
@@ -771,6 +775,7 @@ POSSIBLE_LEVELS = (
 @click.option('-sp', '--serviceid-prefix', default=None, help='service ID prefix (for testing purposes)')
 @click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
 @click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
+@click.option('-t', '--tags', default='', help='comma-separated list of tags to append to all registered services')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
