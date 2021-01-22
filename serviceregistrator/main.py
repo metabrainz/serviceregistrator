@@ -169,6 +169,9 @@ class ContainerInfo:
         self._services = services
         return services
 
+    def service_identifiers(self):
+        return [service.id for service in self.services]
+
 
 SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
 SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
@@ -637,6 +640,56 @@ class ServiceRegistrator:
             pass
         self.unregister_services(container_info)
 
+    def is_our_identifier(self, serviceid, prefix=''):
+        identifier = serviceid.split(':')
+        l = len(identifier)
+        if l < 4:
+            return False
+        if prefix:
+            if identifier[0] != prefix:
+                return False
+            else:
+                identifier = identifier[1:]
+                l -= 1
+        if l > 4:
+            return False
+        if l == 4:
+            if identifier[-1] != 'udp':
+                return False
+            else:
+                identifier = identifier[:-1]
+                l -= 1
+        if l != 3:
+            return False
+        if identifier[0] != self.hostname:
+            return False
+        return True
+
+    def containers_service_identifiers(self):
+        services = []
+        for cid, container_info in self.containers.items():
+            services.extend(container_info.service_identifiers())
+        return set(services)
+
+    def consul_services(self):
+        try:
+            return self.consul_client.agent.services()
+        except Exception as e:
+            log.error(e)
+            return {}
+
+    def cleanup(self):
+        log.debug("cleanup")
+        registered_services = self.consul_services()
+        our_services = self.containers_service_identifiers()
+        prefix = self.context.options['serviceid_prefix']
+        for serviceid in registered_services:
+            if not self.is_our_identifier(serviceid, prefix):
+                log.debug("cleanup: skipping {}, not ours".format(serviceid))
+                continue
+            if serviceid not in our_services:
+                self.consul_unregister_service(serviceid)
+
 
 class Context:
     kill_now = False
@@ -714,6 +767,7 @@ def main(**options):
             log.info("Starting...")
             serviceregistrator = ServiceRegistrator(context)
             serviceregistrator.list_containers()
+            serviceregistrator.cleanup()
             serviceregistrator.dump_events()
         except docker.errors.DockerException as e:
             log.error(e)
