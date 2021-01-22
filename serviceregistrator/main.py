@@ -596,6 +596,19 @@ class ServiceRegistrator:
             return self.make_check_docker(service, params)
         return None
 
+    @staticmethod
+    def service_meta(service):
+        meta = {}
+        for k, v in service.attrs.items():
+            if k.startswith('check_'):
+                # ignore SERVICE_CHECK_*
+                continue
+            if k == 'ip':
+                # ignore SERVICE_IP
+                continue
+            meta[k] = v
+        return meta
+
     def consul_register_service(self, service):
         log.debug("consul register service {}".format(service.id))
         try:
@@ -605,7 +618,7 @@ class ServiceRegistrator:
                 address=service.ip,
                 port=service.port,
                 tags=service.tags,
-                meta=service.attrs,
+                meta=self.service_meta(service),
                 check=self.make_check(service)
             )
         except Exception as e:
