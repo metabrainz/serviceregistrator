@@ -110,6 +110,7 @@ class ContainerInfo:
         self.hostname = hostname
         self.serviceip = serviceip
         self.serviceid_prefix = None
+        self._services = None
 
     def __str__(self):
         return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\nservices: \n{}\n'.format(
@@ -122,6 +123,9 @@ class ContainerInfo:
 
     @property
     def services(self):
+        if self._services is not None:
+            return self._services
+
         def getattr(key, port):
             if port in self.metadata_with_port and key in self.metadata_with_port[port]:
                 return self.metadata_with_port[port][key]
@@ -161,6 +165,7 @@ class ContainerInfo:
             service = Service(self.cid, service_id, service_name, service_ip,
                               port.external, tags=list(set(service_tags)), attrs=service_attrs)
             services.append(service)
+        self._services = services
         return services
 
 
