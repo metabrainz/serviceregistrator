@@ -51,6 +51,21 @@ EXTPORT=8084
 docker rm -f "$NAME"
 docker run -d \
 	--env "SERVICE_${INTPORT}_CHECK_HTTP=/" \
+	--env "SERVICE_${INTPORT}_CHECK_HTTP_METHOD=HEAD" \
+	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+	--env "SERVICE_${INTPORT}_CHECK_INTERVAL=5s" \
+	--env "SERVICE_${INTPORT}_NAME=$NAME" \
+	--hostname "$HOSTNAME" \
+	--name "$NAME" \
+	--publish "${EXTPORT}:${INTPORT}" \
+	dummyservice
+
+NAME="dummyservice_checkscript"
+INTPORT=80
+EXTPORT=8085
+docker rm -f "$NAME"
+docker run -d \
+	--env "SERVICE_${INTPORT}_CHECK_SCRIPT=ping -c 1 127.0.0.1" \
 	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
 	--hostname "$HOSTNAME" \

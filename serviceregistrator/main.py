@@ -265,6 +265,8 @@ class ServiceCheck:
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L53
         # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/consul/consul.go#L115
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-script-check
+        # https://www.consul.io/docs/agent/options#_enable_script_checks
+        # https://www.hashicorp.com/blog/protecting-consul-from-rce-risk-in-specific-configurations
         args = cls._value(params, 'script')
         if args:
             """
