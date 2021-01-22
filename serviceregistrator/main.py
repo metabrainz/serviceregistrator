@@ -108,6 +108,8 @@ class ServiceCheck:
         'header': None,
         'http': '',
         'https': '',
+        'http_method': None,
+        'https_method': None,
         'interval': '10s',
         'shell': '/bin/sh',
         'script': None,
@@ -172,6 +174,8 @@ class ServiceCheck:
             interval, deregister = cls._common_values(params)
             header = cls._value(params, 'header')
             tls_skip_verify = cls._value(params, 'tls_skip_verify')
+            # FIXME: as 2021/01/20, python-consul doesn't support setting method
+            # method = cls._value(params, proto + '_method')
             if header:
                 try:
                     header = json.loads(header)
