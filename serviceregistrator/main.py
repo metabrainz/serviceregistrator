@@ -609,9 +609,20 @@ class ServiceRegistrator:
         except Exception as e:
             log.error(e)
 
+    def consul_unregister_service(self, service_id):
+        log.debug("consul unregister service {}".format(service_id))
+        try:
+            self.consul_client.agent.service.deregister(service_id)
+        except Exception as e:
+            log.error(e)
+
     def register_services(self, container_info):
         for service in container_info.services:
             self.consul_register_service(service)
+
+    def unregister_services(self, container_info):
+        for service in container_info.services:
+            self.consul_unregister_service(service_id)
 
     def register(self, container_info):
         log.info('register {}'.format(container_info.name))
@@ -629,6 +640,7 @@ class ServiceRegistrator:
             log.info('removing {} from containers'.format(container_info.name))
         except KeyError:
             pass
+        self.unregister_services(container_info)
 
 
 class Context:
