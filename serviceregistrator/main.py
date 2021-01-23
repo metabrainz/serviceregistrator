@@ -430,6 +430,10 @@ class ServiceRegistrator:
         def fmtevent(action, etype, cid):
             return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
 
+        unregister_actions = {'pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'}
+        register_actions = {'health_status: healthy', 'start'}
+        handled_actions = unregister_actions | register_actions
+
         for event in self.events:
             if self.context.kill_now:
                 break
@@ -443,14 +447,7 @@ class ServiceRegistrator:
                     log.debug(fmtevent(action, etype, cid))
                 continue
 
-            # Ignore health checks
-            if action.startswith("exec_"):
-                if self.context.options['debug']:
-                    log.debug(fmtevent(action, etype, cid))
-                continue
-
-            # Ignore image destroy (ecs does this regularly)
-            if action == 'destroy':
+            if action not in handled_actions:
                 if self.context.options['debug']:
                     log.debug(fmtevent(action, etype, cid))
                 continue
@@ -463,15 +460,10 @@ class ServiceRegistrator:
                     log.debug("skipping {} ...".format(cid))
                 continue
 
-            if cid in self.containers and action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
-                log.debug(container_info)
-                self.unregister(container_info)
-                continue
-
-            if action in ('health_status: healthy', 'start'):
-                log.debug(container_info)
-                self.register(container_info)
-                continue
+            if action in register_actions:
+                self.register_container(container_info)
+            elif action in unregister_actions:
+                self.unregister_container(container_info)
 
     def docker_get_container_by_id(self, cid):
         return self.docker_client.containers.get(cid)
@@ -616,7 +608,7 @@ class ServiceRegistrator:
             container_info = self.parse_container_meta(cid)
             if container_info:
                 log.debug(container_info)
-                self.register(container_info)
+                self.register_container(container_info)
             elif container_info is not None:
                 log.debug("Skipping {}".format(container_info))
             else:
@@ -700,19 +692,25 @@ class ServiceRegistrator:
         for service in container_info.services:
             self.consul_unregister_service(service.id)
 
-    def register(self, container_info):
+    def register_container(self, container_info):
         log.info('register {}'.format(container_info.name))
+        log.debug(container_info)
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
-    def unregister(self, container_info):
+    def unregister_container(self, container_info):
         log.info('unregister {}'.format(container_info.name))
-        try:
-            del self.containers[container_info.cid]
-            log.info('removing {} from containers'.format(container_info.name))
-        except KeyError:
-            pass
-        self.unregister_services(container_info)
+        log.debug(container_info)
+        if container_info.cid in self.containers:
+            try:
+                self.unregister_services(container_info)
+            except Exception as e:
+                raise e
+            else:
+                del self.containers[container_info.cid]
+                log.info('{} removed from containers'.format(container_info.name))
+        else:
+            log.debug("no registered container {}".format(container_info.name))
 
     def is_our_identifier(self, serviceid, prefix=''):
         identifier = serviceid.split(':')
@@ -751,7 +749,7 @@ class ServiceRegistrator:
             return {}
 
     def cleanup(self):
-        log.debug("cleanup")
+        log.info("cleanup services")
         registered_services = self.consul_services()
         our_services = self.containers_service_identifiers()
         prefix = self.context.options['service_prefix']
