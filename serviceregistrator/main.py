@@ -828,9 +828,14 @@ POSSIBLE_LEVELS = (
 @click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
 @click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
 @click.option('-t', '--tags', default='', help='comma-separated list of tags to append to all registered services')
+@click.option('-dr', '--debug-requests', default=False, is_flag=True, help='log requests')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
+
+    if context.options['debug_requests']:
+        import http.client
+        http.client.HTTPConnection.debuglevel = 1
 
     while not context.kill_now:
         try:
