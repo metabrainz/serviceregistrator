@@ -98,12 +98,10 @@ class Service:
         self.container_id = container_id
 
     def __str__(self):
-        return '==== Service id: {} ====\nname: {}\nip: {}\nport: {}\ntags: {}\nattrs: {}\n'.format(
-            self.id, self.name, self.ip,
-            self.port, self.tags, self.attrs)
+        return '<{} (name:{} ip: {} port: {} tags: {}>'.format(self.id, self.name, self.ip, self.port, self.tags)
 
     def __repr__(self):
-        return f"{type(self).__name__}('{self.container_id}', {self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs}')"
+        return f"{type(self).__name__}('{self.container_id}', '{self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs})"
 
 
 class ServiceCheck:
@@ -318,10 +316,10 @@ class ContainerInfo:
         self.tags = tags
 
     def __str__(self):
-        return '==== name:{} ====\ncid: {}\nports: {}\nmetadata: {}\nmetadata_with_port: {}\nhostname: {}\nservices: \n{}\n'.format(
-            self.name, self.cid, self.ports,
-            self.metadata, self.metadata_with_port,
-            self.hostname, self.services)
+        return f"<{self.name} ({self.cid[:12]})>"
+
+    def __repr__(self):
+        return f"{type(self).__name__}('{self.cid}', '{self.name}', {self.ports}, {self.metadata}, {self.metadata_with_port}, '{self.hostname}', '{self.serviceip}', {self.tags})"
 
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
@@ -607,7 +605,6 @@ class ServiceRegistrator:
             container.reload()  # needed since we use sparse, and want health
             container_info = self.parse_container_meta(cid)
             if container_info:
-                log.debug(container_info)
                 self.register_container(container_info)
             elif container_info is not None:
                 log.debug("Skipping {}".format(container_info))
@@ -658,8 +655,7 @@ class ServiceRegistrator:
         return meta
 
     def consul_register_service(self, service):
-        log.info("consul register service {}: name={} ip={} port={} tags={}".format(
-                 service.id, service.name, service.ip, service.port, service.tags))
+        log.info("consul register service {}".format(service))
         try:
             self.consul_client.agent.service.register(
                 name=service.name,
@@ -675,8 +671,13 @@ class ServiceRegistrator:
         except Exception as e:
             log.error(e)
 
-    def consul_unregister_service(self, service_id):
-        log.info("consul unregister service {}".format(service_id))
+    def consul_unregister_service(self, service):
+        if isinstance(service, Service):
+            log.info("consul unregister service {}".format(service))
+            service_id = service.id
+        else:
+            service_id = service
+            log.info("consul unregister service with id {}".format(service_id))
         try:
             self.consul_client.agent.service.deregister(service_id)
         except ConnectionError as e:
@@ -690,17 +691,17 @@ class ServiceRegistrator:
 
     def unregister_services(self, container_info):
         for service in container_info.services:
-            self.consul_unregister_service(service.id)
+            self.consul_unregister_service(service)
 
     def register_container(self, container_info):
-        log.info('register {}'.format(container_info.name))
-        log.debug(container_info)
+        log.info('register container {}'.format(container_info))
+        log.debug(repr(container_info))
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
     def unregister_container(self, container_info):
-        log.info('unregister {}'.format(container_info.name))
-        log.debug(container_info)
+        log.info('unregister container {}'.format(container_info))
+        log.debug(repr(container_info))
         if container_info.cid in self.containers:
             try:
                 self.unregister_services(container_info)
@@ -708,9 +709,9 @@ class ServiceRegistrator:
                 raise e
             else:
                 del self.containers[container_info.cid]
-                log.info('{} removed from containers'.format(container_info.name))
+                log.info('container {} removed'.format(container_info))
         else:
-            log.debug("no registered container {}".format(container_info.name))
+            log.debug("no registered container {}".format(container_info))
 
     def is_our_identifier(self, serviceid, prefix=''):
         identifier = serviceid.split(':')
