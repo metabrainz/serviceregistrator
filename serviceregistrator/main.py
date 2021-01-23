@@ -425,15 +425,12 @@ class ServiceRegistrator:
         except ConsulException as e:
             log.error("Consul issue: {}".format(e))
 
-    def listen_events(self):
-        yield from self.events
-
-    def dump_events(self):
+    def watch_events(self):
         # TODO: handle exceptions
         def fmtevent(action, etype, cid):
             return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
 
-        for event in self.listen_events():
+        for event in self.events:
             if self.context.kill_now:
                 break
             action = event['Action']
@@ -840,7 +837,7 @@ def main(**options):
             log.info("Starting...")
             serviceregistrator = ServiceRegistrator(context)
             serviceregistrator.sync_with_containers()
-            serviceregistrator.dump_events()
+            serviceregistrator.watch_events()
         except docker.errors.DockerException as e:
             log.error(e)
         except Exception as e:
