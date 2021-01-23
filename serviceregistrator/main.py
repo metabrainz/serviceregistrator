@@ -612,7 +612,7 @@ class ServiceRegistrator:
     def docker_running_containers(self):
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
 
-    def list_containers(self):
+    def sync_with_containers(self):
         for container in self.docker_running_containers():
             cid = container.id
             if cid not in self.containers:
@@ -627,6 +627,7 @@ class ServiceRegistrator:
                     log.debug("Skipping {}".format(cid))
             else:
                 log.debug("{} already in containers".format(cid))
+        self.cleanup()
 
     def make_check(self, service):
         checks = {
@@ -838,8 +839,7 @@ def main(**options):
         try:
             log.info("Starting...")
             serviceregistrator = ServiceRegistrator(context)
-            serviceregistrator.list_containers()
-            serviceregistrator.cleanup()
+            serviceregistrator.sync_with_containers()
             serviceregistrator.dump_events()
         except docker.errors.DockerException as e:
             log.error(e)
