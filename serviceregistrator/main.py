@@ -78,6 +78,11 @@ def health(self):
 Container.health = health
 
 
+class ConsulConnectionError(Exception):
+    def __init__(self, msg, *args, **kwargs):
+        super().__init__('Consul connection error:  {}'.format(msg), *args, **kwargs)
+
+
 class Service:
 
     def __init__(self, container_id, id_, name, ip, port, tags=None, attrs=None):
@@ -392,17 +397,12 @@ class ServiceRegistrator:
     def __init__(self, context):
         self.context = context
         self.hostname = socket.gethostname()
-        log.info(context.options)
-        log.info("Using IP: {}".format(context.options['ip']))
-        log.info("Using docker socket: {}".format(context.options['dockersock']))
 
-        self.consul_host = context.options['consul_host']
-        self.consul_port = context.options['consul_port']
-        log.info("Using Consul Agent at {}:{}".format(self.consul_host, self.consul_port))
-
-        self._init_docker()
         self._init_consul()
+        self._init_docker()
         self.containers = self.context.containers
+
+        log.info("Options: {}".format(context.options))
 
     def _init_docker(self):
         self.docker_client = docker.from_env()
@@ -415,15 +415,15 @@ class ServiceRegistrator:
         self.context.register_on_exit('close_events', close_events)
 
     def _init_consul(self):
-        self.consul_client = consul.Consul(host=self.consul_host, port=self.consul_port)
+        host = self.context.options['consul_host']
+        port = self.context.options['consul_port']
 
         try:
+            self.consul_client = consul.Consul(host=host, port=port)
             peers = self.consul_client.status.peers()
-            log.info("Consul Agent has {} peers".format(len(peers)))
-        except ConnectionError:
-            log.error("Could not connect with Consul Agent.")
-        except ConsulException as e:
-            log.error("Consul issue: {}".format(e))
+            log.info("Using Consul Agent at {}:{} (peers: {})".format(host, port, peers))
+        except (ConnectionError, ConsulException) as e:
+            raise ConsulConnectionError(e)
 
     def watch_events(self):
         # TODO: handle exceptions
@@ -464,12 +464,12 @@ class ServiceRegistrator:
                 continue
 
             if cid in self.containers and action in ('pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'):
-                log.info(container_info)
+                log.debug(container_info)
                 self.unregister(container_info)
                 continue
 
             if action in ('health_status: healthy', 'start'):
-                log.info(container_info)
+                log.debug(container_info)
                 self.register(container_info)
                 continue
 
@@ -612,18 +612,15 @@ class ServiceRegistrator:
     def sync_with_containers(self):
         for container in self.docker_running_containers():
             cid = container.id
-            if cid not in self.containers:
-                container.reload()  # needed since we use sparse, and want health
-                container_info = self.parse_container_meta(cid)
-                if container_info:
-                    log.info(container_info)
-                    self.register(container_info)
-                elif container_info is not None:
-                    log.debug("Skipping {}".format(container_info))
-                else:
-                    log.debug("Skipping {}".format(cid))
+            container.reload()  # needed since we use sparse, and want health
+            container_info = self.parse_container_meta(cid)
+            if container_info:
+                log.debug(container_info)
+                self.register(container_info)
+            elif container_info is not None:
+                log.debug("Skipping {}".format(container_info))
             else:
-                log.debug("{} already in containers".format(cid))
+                log.debug("Skipping {}".format(cid))
         self.cleanup()
 
     def make_check(self, service):
@@ -648,10 +645,10 @@ class ServiceRegistrator:
             try:
                 ret = checks[check](service, params)
                 if ret:
-                    log.debug("{}: setting check {}: {}".format(service.id, check, ret))
+                    log.info("set check {} for service {}: {}".format(check, service.id, ret))
                 return ret
             except Exception as e:
-                log.error("{}: setting check {}: {}".format(service.id, check, e))
+                log.error("error while setting check {} for service {}: {}".format(check, service.id, e))
                 log.error(traceback.format_exc())
         return None
 
@@ -669,7 +666,8 @@ class ServiceRegistrator:
         return meta
 
     def consul_register_service(self, service):
-        log.debug("consul register service {}".format(service.id))
+        log.info("consul register service {}: name={} ip={} port={} tags={}".format(
+                 service.id, service.name, service.ip, service.port, service.tags))
         try:
             self.consul_client.agent.service.register(
                 name=service.name,
@@ -680,13 +678,17 @@ class ServiceRegistrator:
                 meta=self.service_meta(service),
                 check=self.make_check(service)
             )
+        except ConnectionError as e:
+            raise ConsulConnectionError(e)
         except Exception as e:
             log.error(e)
 
     def consul_unregister_service(self, service_id):
-        log.debug("consul unregister service {}".format(service_id))
+        log.info("consul unregister service {}".format(service_id))
         try:
             self.consul_client.agent.service.deregister(service_id)
+        except ConnectionError as e:
+            raise ConsulConnectionError(e)
         except Exception as e:
             log.error(e)
 
@@ -742,6 +744,8 @@ class ServiceRegistrator:
     def consul_services(self):
         try:
             return self.consul_client.agent.services()
+        except ConnectionError as e:
+            raise ConsulConnectionError(e)
         except Exception as e:
             log.error(e)
             return {}
@@ -832,6 +836,8 @@ POSSIBLE_LEVELS = (
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
+    delay = context.options['delay']
+    consul_connected = False
 
     if context.options['debug_requests']:
         import http.client
@@ -839,10 +845,14 @@ def main(**options):
 
     while not context.kill_now:
         try:
-            log.info("Starting...")
             serviceregistrator = ServiceRegistrator(context)
+            consul_connected = True
             serviceregistrator.sync_with_containers()
             serviceregistrator.watch_events()
+        except ConsulConnectionError as e:
+            if consul_connected:
+                log.error(e)
+            consul_connected = False
         except docker.errors.DockerException as e:
             log.error(e)
         except Exception as e:
@@ -850,7 +860,6 @@ def main(**options):
             log.error(traceback.format_exc())
         finally:
             if not context.kill_now:
-                delay = context.options['delay']
                 log.debug("sleeping {} second(s)...".format(delay))
                 sleep(delay)
 
