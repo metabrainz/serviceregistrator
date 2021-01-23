@@ -634,7 +634,7 @@ class ServiceRegistrator:
             try:
                 ret = checks[check](service, params)
                 if ret:
-                    log.info("set check {} for service {}: {}".format(check, service.id, ret))
+                    log.info("REGISTER CHECK {} for service {}: {}".format(check, service.id, ret))
                 return ret
             except Exception as e:
                 log.error("error while setting check {} for service {}: {}".format(check, service.id, e))
@@ -655,7 +655,8 @@ class ServiceRegistrator:
         return meta
 
     def consul_register_service(self, service):
-        log.info("consul register service {}".format(service))
+        log.info("REGISTER SERVICE {}".format(service))
+        log.debug(repr(service))
         try:
             self.consul_client.agent.service.register(
                 name=service.name,
@@ -673,11 +674,12 @@ class ServiceRegistrator:
 
     def consul_unregister_service(self, service):
         if isinstance(service, Service):
-            log.info("consul unregister service {}".format(service))
+            log.info("UNREGISTER SERVICE {}".format(service))
             service_id = service.id
+            log.debug(repr(service))
         else:
             service_id = service
-            log.info("consul unregister service with id {}".format(service_id))
+            log.info("UNREGISTER SERVICE with id {}".format(service_id))
         try:
             self.consul_client.agent.service.deregister(service_id)
         except ConnectionError as e:
@@ -694,15 +696,15 @@ class ServiceRegistrator:
             self.consul_unregister_service(service)
 
     def register_container(self, container_info):
-        log.info('register container {}'.format(container_info))
+        log.info('REGISTER CONTAINER {}'.format(container_info))
         log.debug(repr(container_info))
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
     def unregister_container(self, container_info):
-        log.info('unregister container {}'.format(container_info))
-        log.debug(repr(container_info))
         if container_info.cid in self.containers:
+            log.info('UNREGISTER CONTAINER {}'.format(container_info))
+            log.debug(repr(container_info))
             try:
                 self.unregister_services(container_info)
             except Exception as e:
@@ -820,13 +822,13 @@ POSSIBLE_LEVELS = (
 
 @click.command()
 @click.option('-lf', '--logfile', default=None, help="log file path")
-@click.option('-ll', '--loglevel', default="DEBUG", help="log level",
+@click.option('-ll', '--loglevel', default="INFO", help="log level",
               type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
               callback=loglevelfmt)
 @click.option('-ip', '--ip', required=True, help="ip to use for services")
 @click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
 @click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
-@click.option('-dg', '--debug', is_flag=True, help='Enables debug mode')
+@click.option('-dg', '--debug', is_flag=True, help='Output extra debug info')
 @click.option('-sp', '--service-prefix', default=None, help='service ID/name prefix (for testing purposes)')
 @click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
 @click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
