@@ -695,8 +695,8 @@ class ServiceRegistrator:
             self.consul_register_service(service)
 
     def unregister_services(self, container_info):
-        for service_id in container_info.services:
-            self.consul_unregister_service(service_id)
+        for service in container_info.services:
+            self.consul_unregister_service(service.id)
 
     def register(self, container_info):
         log.info('register {}'.format(container_info.name))
