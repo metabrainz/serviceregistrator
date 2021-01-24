@@ -86,14 +86,14 @@ class ConsulConnectionError(Exception):
 class Service:
 
     def __init__(self, container_id, id_, name, ip, port, tags=None, attrs=None):
-        #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
+        #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
         self.id = id_      # string               // unique service instance ID
         self.name = name   # string               // service name
         self.ip = ip       # string               // IP address service is located at
         self.port = port   # int                  // port service is listening on
         # []string             // extra tags to classify service
         self.tags = tags if not None else []
-        #  map[string]string    // extra attribute metadata
+        #  map[string]string    // extra attribute metadata
         self.attrs = attrs if not None else dict()
         self.container_id = container_id
 
@@ -196,7 +196,7 @@ class ServiceCheck:
             if method:
                 if cls.consul_version <= (0, 8, 5):
                     # method was buggy before that
-                    # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#085-june-27-2017
+                    # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#085-june-27-2017
                     return None
                 # FIXME: as 2021/01/20, python-consul doesn't support setting method
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#084-june-9-2017
@@ -206,7 +206,7 @@ class ServiceCheck:
                 if cls.consul_version < (1, 7, 0):
                     # not implemented before 1.7.0
                     return None
-                # consul >= 1.7.0
+                # consul >= 1.7.0
                 # https://github.com/hashicorp/consul/pull/6602
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#170-february-11-2020
                 ret['Body'] = body
@@ -300,8 +300,8 @@ class ServiceCheck:
                 args = args.split(' ')
                 return Check.script(args, interval)
             else:
-                # compat
-                # https://github.com/cablehead/python-consul/commit/f405dee1beb6019986307c121702d2e9ad40bcda
+                # compat
+                # https://github.com/cablehead/python-consul/commit/f405dee1beb6019986307c121702d2e9ad40bcda
                 # https://github.com/cablehead/python-consul/commit/e3493a0e6089d01ae37347f452cf7510813e2eb4
                 ret = Check.script(args, interval)
                 ret['script'] = args
@@ -319,7 +319,7 @@ class ServiceCheck:
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L111
         # https://www.consul.io/docs/discovery/checks#docker-interval
         #
-        # NOTE: consul agent should be able to access docker socket: -v /var/run/docker.sock:/var/run/docker.sock
+        # NOTE: consul agent should be able to access docker socket: -v /var/run/docker.sock:/var/run/docker.sock
         script = cls._value(params, 'docker')
         if script:
             """
@@ -335,7 +335,7 @@ class ServiceCheck:
             ret = Check.docker(container_id, shell, script, interval, deregister=deregister)
             # FIXME: as 2021/01/24, python-consul2 uses old script instead of args
             # it was removed in consul 1.1.0
-            # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#110-may-11-2018
+            # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#110-may-11-2018
             if cls.consul_version >= (1, 1, 0):
                 ret['args'] = script.split(" ")
                 del ret['script']
