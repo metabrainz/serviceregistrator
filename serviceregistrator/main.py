@@ -98,10 +98,15 @@ class Service:
         self.container_id = container_id
 
     def __str__(self):
-        return '<{} (name:{} ip: {} port: {} tags: {}>'.format(self.id, self.name, self.ip, self.port, self.tags)
+        return '<{} (name:{} ip: {} port: {} tags: {}>'.format(
+            self.id, self.name, self.ip, self.port, self.tags
+        )
 
     def __repr__(self):
-        return f"{type(self).__name__}('{self.container_id}', '{self.id}', '{self.name}', '{self.ip}', {self.port}, tags={self.tags}, attrs={self.attrs})"
+        return ("{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', "
+                "{s.port}, tags={s.tags}, attrs={s.attrs})").format(
+            t=type(self).__name__,
+            s=self)
 
 
 class ServiceCheck:
@@ -153,18 +158,21 @@ class ServiceCheck:
         Consul HTTP Check
 
         This feature is only available when using Consul 0.5 or newer.
-        Containers specifying these extra metadata in labels or environment will be used to register an HTTP health check with the service.
+        Containers specifying these extra metadata in labels or environment will
+        be used to register an HTTP health check with the service.
 
         SERVICE_80_CHECK_HTTP=/health/endpoint/path
         SERVICE_80_CHECK_INTERVAL=15s
         SERVICE_80_CHECK_TIMEOUT=1s		# optional, Consul default used otherwise
 
-        It works for services on any port, not just 80. If its the only service, you can also use SERVICE_CHECK_HTTP.
+        It works for services on any port, not just 80.
+        If its the only service, you can also use SERVICE_CHECK_HTTP.
 
         Consul HTTPS Check
 
         This feature is only available when using Consul 0.5 or newer.
-        Containers specifying these extra metedata in labels or environment will be used to register an HTTPS health check with the service.
+        Containers specifying these extra metedata in labels or environment will
+        be used to register an HTTPS health check with the service.
 
         SERVICE_443_CHECK_HTTPS=/health/endpoint/path
         SERVICE_443_CHECK_INTERVAL=15s
@@ -276,11 +284,14 @@ class ServiceCheck:
         """
         Consul Script Check
 
-        This feature is tricky because it lets you specify a script check to run from Consul. If running Consul in a container, you're limited to what you can run from that container. For example, curl must be installed for this to work:
+        This feature is tricky because it lets you specify a script check to run from Consul.
+        If running Consul in a container, you're limited to what you can run from that container.
+        For example, curl must be installed for this to work:
 
         SERVICE_CHECK_SCRIPT=curl --silent --fail example.com
 
-        The default interval for any non-TTL check is 10s, but you can set it with _CHECK_INTERVAL. The check command will be interpolated with the $SERVICE_IP and $SERVICE_PORT placeholders:
+        The default interval for any non-TTL check is 10s, but you can set it with _CHECK_INTERVAL.
+        The check command will be interpolated with the $SERVICE_IP and $SERVICE_PORT placeholders:
 
         SERVICE_CHECK_SCRIPT=nc $SERVICE_IP $SERVICE_PORT | grep OK
         """
@@ -360,7 +371,9 @@ class ContainerInfo:
         return f"<{self.name} ({self.cid[:12]})>"
 
     def __repr__(self):
-        return f"{type(self).__name__}('{self.cid}', '{self.name}', {self.ports}, {self.metadata}, {self.metadata_with_port}, '{self.hostname}', '{self.serviceip}', {self.tags})"
+        return (
+            "{t}('{s.cid}', '{s.name}', {s.ports}, {s.metadata}, {s.metadata_with_port}, "
+            "'{s.hostname}', '{s.serviceip}', {s.tags})").format(t=type(self).__name__, s=self)
 
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
