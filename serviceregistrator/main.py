@@ -106,6 +106,7 @@ class Service:
 
 class ServiceCheck:
     defaults = {
+        'body': None,
         'deregister': None,
         'docker': None,
         'header': None,
@@ -122,6 +123,8 @@ class ServiceCheck:
         'ttl': None,
     }
 
+    consul_version = (0, 0, 0)
+
     @classmethod
     def _value(cls, params, key):
         return params.get(key, cls.defaults.get(key))
@@ -133,6 +136,16 @@ class ServiceCheck:
         if deregister:
             deregister = deregister.lower() == 'true'
         return interval, deregister
+
+    @classmethod
+    def _json_value(cls, params, key):
+        value = cls._value(params, key)
+        if value:
+            try:
+                return json.loads(value)
+            except Exception as e:
+                log.error(e)
+        return None
 
     @classmethod
     def _http(cls, service, params, proto='http'):
@@ -176,19 +189,27 @@ class ServiceCheck:
             timeout = cls._value(params, 'timeout')
             interval, deregister = cls._common_values(params)
             tls_skip_verify = cls._value(params, 'tls_skip_verify')
-            # FIXME: as 2021/01/20, python-consul doesn't support setting method
-            method = cls._value(params, proto + '_method')
-            header = cls._value(params, 'header')
-            if header:
-                try:
-                    header = json.loads(header)
-                except Exception as e:
-                    log.error(e)
-                    header = None
+            header = cls._json_value(params, 'header')
             ret = Check.http(url, interval, timeout=timeout, deregister=deregister,
                              header=header, tls_skip_verify=tls_skip_verify)
+            method = cls._value(params, proto + '_method')
             if method:
+                if cls.consul_version <= (0, 8, 5):
+                    # method was buggy before that
+                    # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#085-june-27-2017
+                    return None
+                # FIXME: as 2021/01/20, python-consul doesn't support setting method
+                # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#084-june-9-2017
                 ret['Method'] = method.upper()
+            body = cls._json_value(params, 'body')
+            if body:
+                if cls.consul_version < (1, 7, 0):
+                    # not implemented before 1.7.0
+                    return None
+                # consul >= 1.7.0
+                # https://github.com/hashicorp/consul/pull/6602
+                # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#170-february-11-2020
+                ret['Body'] = body
             return ret
         return None
 
@@ -275,7 +296,17 @@ class ServiceCheck:
             """
             args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             interval = cls._value(params, 'interval')
-            return Check.script(args.split(' '), interval)
+            if cls.consul_version >= (1, 1, 0):
+                args = args.split(' ')
+                return Check.script(args, interval)
+            else:
+                # compat
+                # https://github.com/cablehead/python-consul/commit/f405dee1beb6019986307c121702d2e9ad40bcda
+                # https://github.com/cablehead/python-consul/commit/e3493a0e6089d01ae37347f452cf7510813e2eb4
+                ret = Check.script(args, interval)
+                ret['script'] = args
+                del ret['args']
+                return ret
         return None
 
     @classmethod
@@ -303,8 +334,11 @@ class ServiceCheck:
             interval, deregister = cls._common_values(params)
             ret = Check.docker(container_id, shell, script, interval, deregister=deregister)
             # FIXME: as 2021/01/24, python-consul2 uses old script instead of args
-            ret['args'] = script.split(" ")
-            del ret['script']
+            # it was removed in consul 1.1.0
+            # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#110-may-11-2018
+            if cls.consul_version >= (1, 1, 0):
+                ret['args'] = script.split(" ")
+                del ret['script']
             return ret
         return None
 
@@ -426,7 +460,10 @@ class ServiceRegistrator:
         try:
             self.consul_client = consul.Consul(host=host, port=port)
             peers = self.consul_client.status.peers()
-            log.info("Using Consul Agent at {}:{} (peers: {})".format(host, port, peers))
+            agent_self = self.consul_client.agent.self()
+            self.consul_version = agent_self['Config']['Version']
+            ServiceCheck.consul_version = tuple(map(int, self.consul_version.split('.')))
+            log.info("Using Consul Agent {} at {}:{} (peers: {})".format(self.consul_version, host, port, peers))
         except (ConnectionError, ConsulException) as e:
             raise ConsulConnectionError(e)
 
