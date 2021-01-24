@@ -286,6 +286,9 @@ class ServiceCheck:
          SERVICE_CHECK_DOCKER=curl --silent --fail example.com
         """
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L111
+        # https://www.consul.io/docs/discovery/checks#docker-interval
+        #
+        # NOTE: consul agent should be able to access docker socket: -v /var/run/docker.sock:/var/run/docker.sock
         script = cls._value(params, 'docker')
         if script:
             """
@@ -298,7 +301,11 @@ class ServiceCheck:
             container_id = service.container_id[:12]
             shell = cls._value(params, 'shell')
             interval, deregister = cls._common_values(params)
-            return Check.docker(container_id, shell, script, interval, deregister=deregister)
+            ret = Check.docker(container_id, shell, script, interval, deregister=deregister)
+            # FIXME: as 2021/01/24, python-consul2 uses old script instead of args
+            ret['args'] = script.split(" ")
+            del ret['script']
+            return ret
         return None
 
 

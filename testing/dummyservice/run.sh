@@ -74,3 +74,17 @@ docker run -d \
 	--name "$NAME" \
 	--publish "${EXTPORT}:${INTPORT}" \
 	dummyservice
+
+
+NAME="dummyservice_checkdocker"
+INTPORT=80
+EXTPORT=8086
+docker rm -f "$NAME"
+docker run -d \
+	--env "SERVICE_${INTPORT}_CHECK_DOCKER=/usr/sbin/nginx -T" \
+	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+	--env "SERVICE_${INTPORT}_NAME=$NAME" \
+	--hostname "$HOSTNAME" \
+	--name "$NAME" \
+	--publish "${EXTPORT}:${INTPORT}" \
+	dummyservice
