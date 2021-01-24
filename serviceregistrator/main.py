@@ -657,6 +657,7 @@ class ServiceRegistrator:
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
 
     def sync_with_containers(self):
+        log.info("Sync with containers")
         for container in self.docker_running_containers():
             cid = container.id
             container.reload()  # needed since we use sparse, and want health
@@ -826,6 +827,7 @@ class Context:
     kill_now = False
     on_exit = dict()
     _sig2name = None
+    serviceregistrator = None
 
     def __init__(self, options):
         self.options = options
@@ -836,7 +838,7 @@ class Context:
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
         # following signals may be used later
-        signal.signal(signal.SIGHUP, self.ignore_signal)
+        signal.signal(signal.SIGHUP, self.sync_with_containers)
         signal.signal(signal.SIGUSR1, self.ignore_signal)
         signal.signal(signal.SIGUSR2, self.ignore_signal)
 
@@ -861,6 +863,11 @@ class Context:
 
     def register_on_exit(self, name, func):
         self.on_exit[name] = func
+
+    def sync_with_containers(self, signum, frame):
+        self._log_signal(signum)
+        if self.serviceregistrator:
+            self.serviceregistrator.sync_with_containers()
 
 
 def loglevelfmt(ctx, param, value):
@@ -903,10 +910,10 @@ def main(**options):
 
     while not context.kill_now:
         try:
-            serviceregistrator = ServiceRegistrator(context)
+            context.serviceregistrator = ServiceRegistrator(context)
             consul_connected = True
-            serviceregistrator.sync_with_containers()
-            serviceregistrator.watch_events()
+            context.serviceregistrator.sync_with_containers()
+            context.serviceregistrator.watch_events()
         except ConsulConnectionError as e:
             if consul_connected:
                 log.error(e)
