@@ -1,5 +1,5 @@
 import unittest
-from serviceregistrator.main import ServiceRegistrator, Ports
+from serviceregistrator.registrator import ServiceRegistrator, Ports
 
 
 class DummyContainer:

@@ -1,6 +1,6 @@
 import unittest
 from serviceregistrator import ContainerMetadata
-from serviceregistrator.main import ServiceRegistrator
+from serviceregistrator.registrator import ServiceRegistrator
 
 
 class DummyContainer:
