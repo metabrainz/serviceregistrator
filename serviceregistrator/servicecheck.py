@@ -66,6 +66,11 @@ class ServiceCheck:
         return None
 
     @classmethod
+    def _bool_value(cls, params, key):
+        value = cls._value(params, key)
+        return value and value.lower() == 'true'
+
+    @classmethod
     def _http(cls, service, params, proto='http'):
         """
         Consul HTTP Check
@@ -109,7 +114,7 @@ class ServiceCheck:
             url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
             timeout = cls._value(params, 'timeout')
             interval, deregister = cls._common_values(params)
-            tls_skip_verify = cls._value(params, 'tls_skip_verify')
+            tls_skip_verify = cls._bool_value(params, 'tls_skip_verify')
             header = cls._json_value(params, 'header')
             ret = Check.http(url, interval, timeout=timeout, deregister=deregister,
                              header=header, tls_skip_verify=tls_skip_verify)
