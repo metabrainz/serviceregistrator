@@ -127,7 +127,7 @@ class ServiceCheck:
                 # FIXME: as 2021/01/20, python-consul doesn't support setting method
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#084-june-9-2017
                 ret['Method'] = method.upper()
-            body = cls._json_value(params, 'body')
+            body = cls._value(params, 'body')
             if body:
                 if cls.consul_version < (1, 7, 0):
                     # not implemented before 1.7.0
