@@ -67,7 +67,7 @@ INTPORT=80
 EXTPORT=8085
 docker rm -f "$NAME"
 docker run -d \
-	--env "SERVICE_${INTPORT}_CHECK_SCRIPT=ping -c 1 127.0.0.1" \
+	--env "SERVICE_${INTPORT}_CHECK_SCRIPT=date -u -R" \
 	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
 	--hostname "$HOSTNAME" \
