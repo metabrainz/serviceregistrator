@@ -41,7 +41,7 @@ class ContainerMetadata(UserDict):
             else:
                 super().__setitem__(key, value)
 
-        elif key in ('name', 'id'):
+        elif key in ('name', 'id', 'ip'):
             # those keys are added as is
             super().__setitem__(key, value)
         elif key in ('attrs', ):
