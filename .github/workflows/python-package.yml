@@ -37,5 +37,6 @@ jobs:
     - name: Test with pytest
       run: |
         python -m pip install pytest
-        python -m pip install pytest-cov
-        pytest --cov=serviceregistrator --cov-report=xml --cov-report=html
+        pytest
+        #python -m pip install pytest-cov
+        #pytest --cov=serviceregistrator --cov-report=xml --cov-report=html
