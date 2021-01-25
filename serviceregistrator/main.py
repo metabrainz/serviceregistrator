@@ -364,8 +364,10 @@ class ContainerInfo:
         self.hostname = hostname
         self.serviceip = serviceip
         self.service_prefix = None
-        self._services = None
         self.tags = tags
+
+        self._services = None
+        self._names_count = None
 
     def __str__(self):
         return f"<{self.name} ({self.cid[:12]})>"
@@ -378,58 +380,88 @@ class ContainerInfo:
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
 
+    def get_attr(self, key, port):
+        if port in self.metadata_with_port and key in self.metadata_with_port[port]:
+            return self.metadata_with_port[port][key]
+        elif key in self.metadata:
+            return self.metadata[key]
+        else:
+            return None
+
+    def get_name(self, port):
+        name = self.get_attr('name', port.internal)
+        if name and self.service_prefix:
+            return self.service_prefix + ':' + name
+        return name
+
+    def names_count(self):
+        """Count services with same name or no name"""
+        names_count = defaultdict(lambda: 0)
+        for port in self.ports:
+            name = self.get_name(port)
+            if name:
+                names_count[name] += 1
+        return names_count
+
+    def build_service_name(self, port):
+        if self._names_count is None:
+            self._names_count = self.names_count()
+        name = self.get_name(port)
+        count = self._names_count[name]
+        if count < 1:
+            return None
+        elif count > 1:
+            name = '{}-{}'.format(name, port.external)
+            if port.protocol != 'tcp':
+                name = '{}-{}'.format(name, port.protocol)
+        return name
+
+    def build_service_tags(self, port):
+        tags = self.get_attr('tags', port.internal) or []
+        if self.tags:
+            tags.extend(self.tags)
+        if port.protocol != 'tcp':
+            tags.append(port.protocol)
+        return list(set(tags))
+
+    def build_service_attrs(self, port):
+        return self.get_attr('attrs', port.internal) or {}
+
+    def build_service_id(self, port):
+        service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
+        if port.protocol != 'tcp':
+            service_id += ":" + port.protocol
+        if self.service_prefix:
+            service_id = "{}:{}".format(self.service_prefix, service_id)
+        return service_id
+
+    def build_service_ip(self, port):
+        return self.get_attr('ip', port.internal) or self.serviceip
+
     @property
     def services(self):
         if self._services is not None:
             return self._services
 
-        def getattr(key, port):
-            if port in self.metadata_with_port and key in self.metadata_with_port[port]:
-                return self.metadata_with_port[port][key]
-            elif key in self.metadata:
-                return self.metadata[key]
-            else:
-                return None
-
-        def get_name(port):
-            name = getattr('name', port.internal)
-            if name and self.service_prefix:
-                return self.service_prefix + ':' + name
-            return name
-
-        # count services with same name or no name
-        names_count = defaultdict(lambda: 0)
-        for port in self.ports:
-            name = get_name(port)
-            if name:
-                names_count[name] += 1
+        self._names_count = None
 
         services = list()
         for port in self.ports:
-            service_name = get_name(port)
-            count = names_count[service_name]
-            if count < 1:
+            service_name = self.build_service_name(port)
+            if service_name is None:
                 log.debug("Skipping port {}, no service name set".format(port))
                 continue
-            elif count > 1:
-                service_name = '{}-{}'.format(service_name, port.external)
-                if port.protocol != 'tcp':
-                    service_name = '{}-{}'.format(service_name, port.protocol)
-
-            service_tags = getattr('tags', port.internal) or []
-            if self.tags:
-                service_tags.extend(self.tags)
-            service_attrs = getattr('attrs', port.internal) or {}
-            service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
-            if port.protocol != 'tcp':
-                service_id += ":" + port.protocol
-                service_tags.append(port.protocol)
-            if self.service_prefix:
-                service_id = "{}:{}".format(self.service_prefix, service_id)
-            service_ip = getattr('ip', port.internal) or self.serviceip
-            service = Service(self.cid, service_id, service_name, service_ip,
-                              port.external, tags=list(set(service_tags)), attrs=service_attrs)
-            services.append(service)
+            services.append(
+                Service(
+                    self.cid,
+                    self.build_service_id(port),
+                    service_name,
+                    self.build_service_ip(port),
+                    port.external,
+                    tags=self.build_service_tags(port),
+                    attrs=self.build_service_attrs(port)
+                )
+            )
         self._services = services
         return services
 
