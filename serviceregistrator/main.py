@@ -477,6 +477,19 @@ Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
 
 
 class ServiceRegistrator:
+    unregister_actions = {
+        'die',
+        'health_status: unhealthy',
+        'kill',
+        'oom',
+        'pause',
+        'stop',
+    }
+    register_actions = {
+        'health_status: healthy',
+        'start'
+    }
+    handled_actions = unregister_actions | register_actions
 
     def __init__(self, context):
         self.context = context
@@ -512,15 +525,12 @@ class ServiceRegistrator:
         except (ConnectionError, ConsulException) as e:
             raise ConsulConnectionError(e)
 
+    @staticmethod
+    def fmtevent(action, etype, cid):
+        return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
+
     def watch_events(self):
-        # TODO: handle exceptions
-        def fmtevent(action, etype, cid):
-            return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
-
-        unregister_actions = {'pause', 'health_status: unhealthy', 'stop', 'die', 'kill', 'oom'}
-        register_actions = {'health_status: healthy', 'start'}
-        handled_actions = unregister_actions | register_actions
-
+        debug = self.context.options['debug']
         for event in self.events:
             if self.context.kill_now:
                 break
@@ -530,26 +540,26 @@ class ServiceRegistrator:
 
             # with only listen for container events
             if etype != 'container':
-                if self.context.options['debug']:
-                    log.debug(fmtevent(action, etype, cid))
+                if debug:
+                    log.debug(self.fmtevent(action, etype, cid))
                 continue
 
-            if action not in handled_actions:
-                if self.context.options['debug']:
-                    log.debug(fmtevent(action, etype, cid))
+            if action not in self.handled_actions:
+                if debug:
+                    log.debug(self.fmtevent(action, etype, cid))
                 continue
 
-            log.info(fmtevent(action, etype, cid))
+            log.info(self.fmtevent(action, etype, cid))
 
             container_info = self.parse_container_meta(cid)
             if not container_info:
-                if self.context.options['debug']:
+                if debug:
                     log.debug("skipping {} ...".format(cid))
                 continue
 
-            if action in register_actions:
+            if action in self.register_actions:
                 self.register_container(container_info)
-            elif action in unregister_actions:
+            elif action in self.unregister_actions:
                 self.unregister_container(container_info)
 
     def docker_get_container_by_id(self, cid):
