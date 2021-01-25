@@ -162,8 +162,8 @@ class ServiceCheck:
         """
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L85
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
-        tcp = cls._value(params, 'tcp')
-        if tcp.lower() == 'true':
+        tcp = cls._bool_value(params, 'tcp')
+        if tcp:
             """
             Attempt to establish a tcp connection to the specified *host* and
             *port* at a specified *interval* with optional *timeout* and optional
