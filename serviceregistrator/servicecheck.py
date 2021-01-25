@@ -53,8 +53,6 @@ class ServiceCheck:
     def _common_values(cls, params):
         interval = cls._value(params, 'interval')
         deregister = cls._value(params, 'deregister')
-        if deregister:
-            deregister = deregister.lower() == 'true'
         return interval, deregister
 
     @classmethod
