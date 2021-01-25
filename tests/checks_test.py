@@ -1,3 +1,4 @@
+import pytest
 import unittest
 from serviceregistrator.service import Service
 from serviceregistrator.servicecheck import ServiceCheck
@@ -43,6 +44,11 @@ class TestServiceCheckFunctions(unittest.TestCase):
 
     def test_json_value_not_ok(self):
         self.params['key'] = '{"k": "v",}'
+        value = ServiceCheck._json_value(self.params, 'key')
+        self.assertIsNone(value)
+
+    def test_json_value_empty(self):
+        self.params['key'] = ''
         value = ServiceCheck._json_value(self.params, 'key')
         self.assertIsNone(value)
 
@@ -153,3 +159,133 @@ class TestServiceCheckHttp(unittest.TestCase):
         params['tls_skip_verify'] = 'false'
         check = ServiceCheck.https(self.dummyservice, params)
         self.assertNotIn('TLSSkipVerify', check)
+
+
+class TestServiceCheckTcp(unittest.TestCase):
+
+    def setUp(self):
+        ServiceCheck.consul_version = (1, 7, 0)
+        self.dummyservice = DummyService()
+        self.params_tcp = {
+            'tcp': 'True',
+            'interval': '17s',
+            'timeout': '3s',
+            'deregister': '666s',
+        }
+
+    def test_check_tcp(self):
+        params = self.params_tcp
+        check = ServiceCheck.tcp(self.dummyservice, params)
+        self.assertEqual(check['tcp'], '6.6.6.6:666')
+        self.assertEqual(check['interval'], '17s')
+        self.assertEqual(check['timeout'], '3s')
+        self.assertEqual(check['DeregisterCriticalServiceAfter'], '666s')
+        self.assertEqual(len(check), 4)
+
+    def test_check_tcp_false(self):
+        params = self.params_tcp
+        params['tcp'] = 'false'
+        check = ServiceCheck.tcp(self.dummyservice, params)
+        self.assertIsNone(check)
+
+
+class TestServiceCheckTtl(unittest.TestCase):
+
+    def setUp(self):
+        ServiceCheck.consul_version = (1, 7, 0)
+        self.dummyservice = DummyService()
+        self.params_ttl = {
+            'ttl': '17s',
+        }
+
+    def test_check_ttl(self):
+        params = self.params_ttl
+        check = ServiceCheck.ttl(self.dummyservice, params)
+        self.assertEqual(check['ttl'], '17s')
+        self.assertEqual(len(check), 1)
+
+    def test_check_ttl_empty(self):
+        params = self.params_ttl
+        params['ttl'] = ''
+        check = ServiceCheck.ttl(self.dummyservice, params)
+        self.assertIsNone(check)
+
+
+class TestServiceCheckScript(unittest.TestCase):
+
+    def setUp(self):
+        ServiceCheck.consul_version = (1, 7, 0)
+        self.dummyservice = DummyService()
+        self.params_script = {
+            'script': 'command arg1 arg2',
+            'interval': '5s',
+        }
+
+    def test_check_script(self):
+        params = self.params_script
+        check = ServiceCheck.script(self.dummyservice, params)
+        self.assertEqual(check['args'], ['command', 'arg1', 'arg2'])
+        self.assertEqual(check['interval'], '5s')
+        self.assertEqual(len(check), 2)
+
+    def test_check_script_replace(self):
+        params = self.params_script
+        params['script'] = 'command $SERVICE_IP:$SERVICE_PORT'
+        check = ServiceCheck.script(self.dummyservice, params)
+        self.assertEqual(check['args'], ['command', '6.6.6.6:666'])
+
+    def test_check_script_empty(self):
+        params = self.params_script
+        params['script'] = ''
+        check = ServiceCheck.script(self.dummyservice, params)
+        self.assertIsNone(check)
+
+    def test_check_script_consul_1(self):
+        ServiceCheck.consul_version = (0, 9, 6)
+        params = self.params_script
+        with pytest.deprecated_call():
+            check = ServiceCheck.script(self.dummyservice, params)
+        self.assertEqual(check['script'], 'command arg1 arg2')
+        self.assertEqual(check['interval'], '5s')
+        self.assertEqual(len(check), 2)
+
+
+class TestServiceCheckDocker(unittest.TestCase):
+
+    def setUp(self):
+        ServiceCheck.consul_version = (1, 7, 0)
+        self.dummyservice = DummyService()
+        self.params_docker = {
+            'docker': 'command arg1 arg2',
+            'interval': '5s',
+            'shell': '/bin/sh',
+        }
+
+    def test_check_docker(self):
+        params = self.params_docker
+        check = ServiceCheck.docker(self.dummyservice, params)
+        print(check)
+        # {'docker_container_id': 'deadbeef', 'shell': '/bin/sh', 'interval': '5s', 'args': ['command', 'arg1', 'arg2']}
+        self.assertEqual(check['args'], ['command', 'arg1', 'arg2'])
+        self.assertEqual(check['docker_container_id'], 'deadbeef')
+        self.assertEqual(check['shell'], '/bin/sh')
+        self.assertEqual(check['interval'], '5s')
+        self.assertEqual(len(check), 4)
+
+    def test_check_docker_empty(self):
+        params = self.params_docker
+        params['docker'] = ''
+        check = ServiceCheck.docker(self.dummyservice, params)
+        self.assertIsNone(check)
+
+    def test_check_docker_consul_1(self):
+        ServiceCheck.consul_version = (0, 9, 6)
+        params = self.params_docker
+        check = ServiceCheck.docker(self.dummyservice, params)
+        print(check)
+        # {'docker_container_id': 'deadbeef', 'shell': '/bin/sh', 'interval': '5s', 'args': ['command', 'arg1', 'arg2']}
+        self.assertEqual(check['script'], 'command arg1 arg2')
+        self.assertEqual(check['docker_container_id'], 'deadbeef')
+        self.assertEqual(check['shell'], '/bin/sh')
+        self.assertEqual(check['interval'], '5s')
+        self.assertEqual(len(check), 4)
