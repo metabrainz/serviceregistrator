@@ -47,6 +47,18 @@ class TestExtractPortsBridge(TestExtractPortsDefault):
         print(self.container.attrs)
 
 
+class TestExtractPortsOther(TestExtractPortsDefault):
+
+    def setUp(self):
+        super().setUp()
+        self.container.attrs['HostConfig']['NetworkMode'] = 'other'
+        print(self.container.attrs)
+
+    def test_extract_ports(self):
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(ports, [])
+
+
 class TestExtractPortsHost(unittest.TestCase):
 
     def setUp(self):
