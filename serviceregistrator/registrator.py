@@ -159,16 +159,9 @@ class ServiceRegistrator:
     def extract_ports(container):
         """ Extract ports from container metadata"""
 
-        defaultip = ""
-        networkmode = container.attrs['HostConfig']['NetworkMode']
-        if networkmode not in ('bridge', 'default', 'host'):
-            # not yet used
-            defaultip = container.attrs['NetworkSettings']['Networks'][networkmode]['IPAddress']
-        if not defaultip:
-            defaultip = "0.0.0.0"
-
         ports = list()
 
+        networkmode = container.attrs['HostConfig']['NetworkMode']
         if networkmode == 'host':
             # Extract configured host port mappings, relevant when using --net=host
             exposed_ports = container.attrs['Config']['ExposedPorts']
@@ -179,9 +172,9 @@ class ServiceRegistrator:
                         internal=int(port),
                         external=int(port),
                         protocol=protocol,
-                        ip=defaultip
+                        ip="0.0.0.0"
                     ))
-        else:
+        elif networkmode in ('bridge', 'default'):
             # Extract runtime port mappings, relevant when using --net=bridge
             port_data = container.attrs['NetworkSettings']['Ports']
             # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
