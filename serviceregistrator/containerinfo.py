@@ -39,6 +39,7 @@ class ContainerInfo:
         self.serviceip = serviceip
         self.service_prefix = None
         self.tags = tags
+        self.health = None
 
         self._services = None
         self._names_count = None

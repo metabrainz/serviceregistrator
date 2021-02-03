@@ -284,6 +284,9 @@ class ServiceRegistrator:
                                        self.hostname, self.context.options['ip'], tags)
         if self.context.options['service_prefix']:
             container_info.service_prefix = self.context.options['service_prefix']
+        health = container.health
+        if health != 'none':
+            container_info.health = health
         return container_info
 
     def docker_running_containers(self):
@@ -392,6 +395,9 @@ class ServiceRegistrator:
             self.consul_unregister_service(service)
 
     def register_container(self, container_info):
+        if container_info.health is not None and container_info.health != 'healthy':
+            log.info("REGISTER CONTAINER SKIPPED (unhealthy): {}".format(container_info))
+            return
         log.info('REGISTER CONTAINER {}'.format(container_info))
         log.debug(repr(container_info))
         self.containers[container_info.cid] = container_info
