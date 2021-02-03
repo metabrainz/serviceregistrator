@@ -78,9 +78,16 @@ class Context:
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
         # following signals may be used later
-        signal.signal(signal.SIGHUP, self.sync_with_containers)
         signal.signal(signal.SIGUSR1, self.ignore_signal)
         signal.signal(signal.SIGUSR2, self.ignore_signal)
+
+        # those signals force a resynchronisation
+        signal.signal(signal.SIGHUP, self.sync_with_containers)
+        signal.signal(signal.SIGALRM, self.sync_with_containers)
+        resync = float(self.options['resync'])
+        if resync > 0.0:
+            log.info("Resync every {} seconds".format(resync))
+            signal.setitimer(signal.ITIMER_REAL, resync, resync)
 
     def _log_signal(self, signum):
         if self._sig2name is None:

@@ -93,6 +93,7 @@ class ServiceRegistrator:
         self.containers = self.context.containers
 
         log.info("Options: {}".format(context.options))
+        self.syncing = False
 
     def _init_docker(self):
         self.docker_client = docker.from_env()
@@ -127,6 +128,10 @@ class ServiceRegistrator:
         for event in self.events:
             if self.context.kill_now:
                 break
+            if self.syncing:
+                if debug:
+                    log.debug("skip event, sync in progress...")
+                continue
             action = event['Action']
             etype = event['Type']
             cid = event['Actor']['ID']
@@ -285,6 +290,10 @@ class ServiceRegistrator:
         return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
 
     def sync_with_containers(self):
+        if self.syncing:
+            # it can be called by signal
+            return
+        self.syncing = True
         log.info("Sync with containers")
         for container in self.docker_running_containers():
             cid = container.id
@@ -297,6 +306,7 @@ class ServiceRegistrator:
             else:
                 log.debug("Skipping {}".format(cid))
         self.cleanup()
+        self.syncing = False
 
     def make_check(self, service):
         checks = {

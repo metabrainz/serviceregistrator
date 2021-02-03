@@ -60,6 +60,8 @@ POSSIBLE_LEVELS = (
 @click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
 @click.option('-t', '--tags', default='', help='comma-separated list of tags to append to all registered services')
 @click.option('-dr', '--debug-requests', default=False, is_flag=True, help='log requests')
+@click.option('-rs', '--resync', default=0, type=click.INT,
+              help='frequency in seconds with which services are resynchronized')
 def main(**options):
     """Register docker services into consul"""
     context = Context(options)
