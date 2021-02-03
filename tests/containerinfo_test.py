@@ -2,7 +2,6 @@ import unittest
 from serviceregistrator import ContainerMetadata
 from serviceregistrator.containerinfo import ContainerInfo
 from serviceregistrator.registrator import Ports
-from serviceregistrator.service import Service
 
 
 class TestContainerInfo(unittest.TestCase):
