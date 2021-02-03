@@ -2,4 +2,4 @@ FROM nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 RUN mkdir -p /www
 COPY ./index.html /www
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=5s CMD curl --fail --write-out '%{http_code}' --silent --output /dev/null --max-time 5 http://localhost:80 || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=5s CMD curl --user-agent "docker-health-check" --fail --write-out '%{http_code}' --silent --output /dev/null --max-time 5 http://localhost:80 || exit 1
