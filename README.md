@@ -2,35 +2,37 @@
 
 An alternative to https://github.com/gliderlabs/registrator
 
-## virtual env
 
-### Create
+## Install poetry
 
-```bash
-python3 -m venv .venv
-```
+https://python-poetry.org/docs/#installation
 
-### Activate
+## Dev env
 
 ```bash
-source .venv/bin/activate
-```
-
-## Dependencies
-
-```bash
-pip install -r requirements/base.txt
-```
-
-## Running (dev)
-
-
-```bash
-pip install -e .
+poetry shell
 ```
 
 ```bash
-serviceregistrator
+poetry install
+```
+
+```bash
+serviceregistrator --help
+```
+
+## Running in a docker container
+
+### Build Image
+
+```bash
+docker build . -t serviceregistrator
+```
+
+### Running
+
+```bash
+docker run --rm serviceregistrator --help
 ```
 
 
