@@ -1,4 +1,0 @@
-click>=7.1.2
-docker>=4.4.1
-setuptools>=38.6.0
-python-consul2>=0.1.5

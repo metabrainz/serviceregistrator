@@ -47,23 +47,91 @@ POSSIBLE_LEVELS = (
 
 
 @click.command()
-@click.option('-lf', '--logfile', default=None, help="log file path")
-@click.option('-ll', '--loglevel', default="INFO", help="log level",
-              type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
-              callback=loglevelfmt)
-@click.option('-ip', '--ip', required=True, help="ip to use for services")
-@click.option('-dy', '--delay', default=1, help="sleep delay between attempts to connect to docker")
-@click.option('-ds', '--dockersock', default='unix://var/run/docker.sock', help='path to docker socket')
-@click.option('-dg', '--debug', is_flag=True, help='Output extra debug info')
-@click.option('-sp', '--service-prefix', default=None, help='service ID/name prefix (for testing purposes)')
-@click.option('-ch', '--consul-host', default='127.0.0.1', help='consul agent host')
-@click.option('-cp', '--consul-port', default=8500, type=click.INT, help='consul agent port')
-@click.option('-t', '--tags', default='', help='comma-separated list of tags to append to all registered services')
-@click.option('-dr', '--debug-requests', default=False, is_flag=True, help='log requests')
-@click.option('-rs', '--resync', default=0, type=click.INT,
-              help='frequency in seconds with which services are resynchronized')
+@click.option(
+    '-i',
+    '--ip',
+    help="address to use for services without SERVICE_IP",
+    required=True
+)
+@click.option(
+    '-t',
+    '--tags',
+    help='comma-separated list of tags to append to all registered services',
+    default=''
+)
+@click.option(
+    '-h',
+    '--consul-host',
+    help='consul agent host',
+    default='127.0.0.1',
+    show_default=True
+)
+@click.option(
+    '-p',
+    '--consul-port',
+    help='consul agent port',
+    default=8500,
+    type=click.INT,
+    show_default=True
+)
+@click.option(
+    '-k',
+    '--dockersock',
+    help='path to docker socket',
+    default='unix://var/run/docker.sock',
+    show_default=True
+)
+@click.option(
+    '-d',
+    '--delay',
+    help="delay in seconds between docker connection attempts",
+    default=1,
+    show_default=True
+)
+@click.option(
+    '-s',
+    '--resync',
+    help='delay between each forced services resync',
+    default=0,
+    type=click.INT,
+    show_default="disabled"
+)
+@click.option(
+    '-f',
+    '--logfile',
+    help="log file path",
+    default=None
+)
+@click.option(
+    '-l',
+    '--loglevel',
+    help="log level",
+    default="INFO",
+    show_default=True,
+    type=click.Choice(POSSIBLE_LEVELS, case_sensitive=False),
+    callback=loglevelfmt
+)
+@click.option(
+    '-G',
+    '--debug',
+    help='output extra debug info',
+    is_flag=True
+)
+@click.option(
+    '-R',
+    '--debug-requests',
+    help='log requests too (debug)',
+    default=False,
+    is_flag=True
+)
+@click.option(
+    '-P',
+    '--service-prefix',
+    help='string to prepend to all service names and IDs (testing purpose)',
+    default=None
+)
 def main(**options):
-    """Register docker services into consul"""
+    """Register docker containers as consul services"""
     context = Context(options)
     delay = context.options['delay']
     consul_connected = False

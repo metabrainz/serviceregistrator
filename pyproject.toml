@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "serviceregistrator"
+version = "0.1.0"
+description = "Bridge betwen docker and consul services, inspired by registrator"
+authors = ["Laurent Monin <zas@metabrainz.org>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+repository = "https://github.com/metabrainz/serviceregistrator"
+
+keywords = ["consul", "docker", "service registration"]
+
+classifiers = [
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.6"
+click = ">=7.1.2"
+docker = ">=4.4.1"
+python-consul2 = ">=0.1.5"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^3.8.4"
+pytest = "^6.2.2"
+wheel = "^0.36.2"
+pytest-cov = "^2.11.1"
+pylint = "^2.6.0"
+
+[tool.poetry.scripts]
+serviceregistrator = "serviceregistrator.main:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

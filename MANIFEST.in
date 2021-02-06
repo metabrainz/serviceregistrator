@@ -1,4 +1,0 @@
-include Dockerfile
-include LICENSE
-include requirements/base.txt
-include services.md
