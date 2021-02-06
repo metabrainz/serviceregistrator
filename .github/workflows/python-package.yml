@@ -48,8 +48,8 @@ jobs:
       - name: Install library
         run: poetry install --no-interaction
 
-      - name: View poetry --help
-        run: poetry --help
+      - name: View poetry --version
+        run: poetry --version
 
       - name: Test with pytest
         run: |
