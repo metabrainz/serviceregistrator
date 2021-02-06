@@ -121,7 +121,7 @@ will be skipped.
 
 ### IP
 
-`-ip` option is mandatory.
+`-i/--ip` option is mandatory.
 
 It can be overridden by `SERVICE_IP` or `SERVICE_<port>_IP`
 
