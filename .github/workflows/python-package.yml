@@ -59,6 +59,6 @@ jobs:
           poetry run flake8 --show-source --statistics --count
       - name: Lint with pylint
         run: |
-          poetry run pylint -j0 serviceregistrator
+          poetry run pylint -j0 --exit-zero serviceregistrator
 
 # vim: set shiftwidth=2 tabstop=2 softtabstop=-1 expandtab:
