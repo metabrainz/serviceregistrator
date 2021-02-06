@@ -44,6 +44,42 @@ docker run --rm serviceregistrator --help
 
 # Usage
 
+## Command-line
+
+```
+Usage: serviceregistrator [OPTIONS]
+
+  Register docker containers as consul services
+
+Options:
+  -i, --ip TEXT                   address to use for services without
+                                  SERVICE_IP  [required]
+
+  -t, --tags TEXT                 comma-separated list of tags to append to
+                                  all registered services
+
+  -h, --consul-host TEXT          consul agent host  [default: 127.0.0.1]
+  -p, --consul-port INTEGER       consul agent port  [default: 8500]
+  -k, --dockersock TEXT           path to docker socket  [default:
+                                  unix://var/run/docker.sock]
+
+  -d, --delay INTEGER             delay in seconds between docker connection
+                                  attempts  [default: 1]
+
+  -s, --resync INTEGER            delay between each forced services resync
+                                  [default: (disabled)]
+
+  -f, --logfile TEXT              log file path
+  -l, --loglevel [CRITICAL|ERROR|WARNING|INFO|DEBUG]
+                                  log level  [default: INFO]
+  -G, --debug                     output extra debug info
+  -R, --debug-requests            log requests too (debug)
+  -P, --service-prefix TEXT       string to prepend to all service names and
+                                  IDs (testing purpose)
+
+  --help                          Show this message and exit.
+```
+
 ## Service Object
 
 ServiceRegistrator is primarily concerned with services that would be added to a
