@@ -158,7 +158,9 @@ def main(**options):
         finally:
             if not context.kill_now:
                 log.debug("sleeping {} second(s)...".format(delay))
-                sleep(delay)
+                for _unused in range(0, delay):
+                    if not context.kill_now:
+                        sleep(1)
 
 
 if __name__ == "__main__":
