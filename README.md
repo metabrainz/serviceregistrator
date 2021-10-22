@@ -141,6 +141,37 @@ encodes useful information in the ID based on this pattern:
 
 	<hostname>:<container-name>:<exposed-port>[:udp if udp]
 
+### Docker
+
+#### Host mode:
+
+```bash
+docker run \
+  --detach \
+  --restart unless-stopped \
+  --name=serviceregistrator \
+  --net=host \
+  --volume=/var/run/docker.sock:/var/run/docker.sock \
+  metabrainz/serviceregistrator:latest \
+	--ip 127.0.0.1 \
+	--consul-port 8500 \
+	--consul-host localhost
+```
+
+#### Network bridge mode:
+
+```bash
+docker run \
+  --detach \
+  --restart unless-stopped \
+  --name=serviceregistrator \
+  --add-host=host.docker.internal:host-gateway \
+  --volume=/var/run/docker.sock:/var/run/docker.sock \
+  metabrainz/serviceregistrator:latest \
+	--ip 127.0.0.1 \
+	--consul-port 8500 \
+	--consul-host host.docker.internal
+```
 
 ### Examples
 
