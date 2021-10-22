@@ -28,6 +28,7 @@ import docker
 import logging
 import traceback
 import re
+import requests
 import socket
 from requests.exceptions import ConnectionError
 
@@ -55,6 +56,27 @@ def health(self):
 
 
 Container.health = health
+
+
+# Monkey patch default requests user agent
+_USER_AGENT = None
+
+
+def my_default_user_agent(name="python-requests"):
+    global _USER_AGENT
+
+    if _USER_AGENT is None:
+        from importlib.metadata import version
+        import platform
+        _USER_AGENT = 'ServiceRegistrator/%s Python %s %s' % (
+            version('serviceregistrator'),
+            platform.python_version(),
+            platform.system()
+        )
+    return _USER_AGENT
+
+
+requests.utils.default_user_agent = my_default_user_agent
 
 
 class ConsulConnectionError(Exception):
