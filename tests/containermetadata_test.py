@@ -48,7 +48,7 @@ class TestContainerMetadata(unittest.TestCase):
             del self.metadata[key]
 
     def test_from_dict(self):
-        a = ContainerMetadata({'tags': ['a', 'b'], 'attrs': {'k': 'v'}, 'name': 'x'})
+        a = ContainerMetadata({'tags': ['a', 'b', ''], 'attrs': {'k': 'v'}, 'name': 'x'})
         a['tags'] = 'c'
         a['k2'] = 'v2'
         a['name'] = 'y'

@@ -40,7 +40,7 @@ class ContainerMetadata(UserDict):
                 value = list(set(value.split(',')))
             if key in self:
                 # uniqify
-                super().__setitem__(key, list(set(self[key] + value)))
+                super().__setitem__(key, [x for x in set(self[key] + value) if x])
             else:
                 super().__setitem__(key, value)
 

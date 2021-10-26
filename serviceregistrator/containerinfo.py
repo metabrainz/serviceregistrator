@@ -38,7 +38,7 @@ class ContainerInfo:
         self.hostname = hostname
         self.serviceip = serviceip
         self.service_prefix = None
-        self.tags = tags
+        self.tags = [x for x in set(tags) if x]
         self.health = None
 
         self._services = None
@@ -97,7 +97,7 @@ class ContainerInfo:
             tags.extend(self.tags)
         if port.protocol != 'tcp':
             tags.append(port.protocol)
-        return list(set(tags))
+        return [x for x in set(tags) if x]
 
     def build_service_attrs(self, port):
         return self.get_attr('attrs', port.internal) or {}
