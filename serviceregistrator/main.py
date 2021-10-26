@@ -78,7 +78,7 @@ POSSIBLE_LEVELS = (
     '-k',
     '--dockersock',
     help='path to docker socket',
-    default='unix://var/run/docker.sock',
+    default='/var/run/docker.sock',
     show_default=True
 )
 @click.option(
