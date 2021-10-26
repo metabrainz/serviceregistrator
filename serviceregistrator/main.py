@@ -136,6 +136,16 @@ def main(**options):
     delay = context.options['delay']
     consul_connected = False
 
+    try:
+        import os
+        import stat
+        is_socket = stat.S_ISSOCK(os.stat(context.options['dockersock']).st_mode)
+        if not is_socket:
+            raise Exception("%r isn't a socket file" % context.options['dockersock'])
+    except Exception as e:
+        log.critical("Option dockersock: %s" % e)
+        context.kill_now = True
+
     if context.options['debug_requests']:
         import http.client
         http.client.HTTPConnection.debuglevel = 1
