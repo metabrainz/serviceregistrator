@@ -29,6 +29,8 @@ log = logging.getLogger('serviceregistrator')
 
 
 class ContainerInfo:
+
+    SERVICE_PREFIX_NAME_SEPARATOR = '-'
     def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
         self.cid = cid
         self.name = name
@@ -66,7 +68,7 @@ class ContainerInfo:
     def get_name(self, port):
         name = self.get_attr('name', port.internal)
         if name and self.service_prefix:
-            return self.service_prefix + ':' + name
+            return self.service_prefix + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
 
     def names_count(self):

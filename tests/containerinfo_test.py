@@ -73,7 +73,12 @@ class TestContainerInfo(unittest.TestCase):
         self.container_info.service_prefix = 'x'
         port = Ports(internal=80, external=8086, protocol='tcp', ip='0.0.0.0')
         value = self.container_info.get_name(port)
-        self.assertEqual(value, 'x:dummyservice_80_name')
+        self.assertEqual(value, (
+            self.container_info.service_prefix
+            + self.container_info.SERVICE_PREFIX_NAME_SEPARATOR
+            + 'dummyservice_80_name'
+            )
+        )
 
     def test_get_name_none(self):
         self.container_info.metadata = ContainerMetadata()
