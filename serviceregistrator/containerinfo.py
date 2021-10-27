@@ -31,6 +31,8 @@ log = logging.getLogger('serviceregistrator')
 class ContainerInfo:
 
     SERVICE_PREFIX_NAME_SEPARATOR = '-'
+    SERVICE_ID_SEPARATOR = ':'
+
     def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
         self.cid = cid
         self.name = name
@@ -105,12 +107,13 @@ class ContainerInfo:
         return self.get_attr('attrs', port.internal) or {}
 
     def build_service_id(self, port):
-        service_id = "{}:{}:{}".format(self.hostname, self.name, port.external)
-        if port.protocol != 'tcp':
-            service_id += ":" + port.protocol
+        parts = []
         if self.service_prefix:
-            service_id = "{}:{}".format(self.service_prefix, service_id)
-        return service_id
+            parts.append(self.service_prefix)
+        parts.extend([self.hostname, self.name, str(port.external)])
+        if port.protocol != 'tcp':
+            parts.append(str(port.protocol))
+        return self.SERVICE_ID_SEPARATOR.join(parts)
 
     def build_service_ip(self, port):
         ip = self.get_attr('ip', port.internal)
