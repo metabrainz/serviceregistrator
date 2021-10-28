@@ -88,6 +88,12 @@ SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
 SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
 SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
 
+# https://www.consul.io/docs/discovery/services#service-and-tag-names-with-dns
+# https://github.com/hashicorp/consul-template/blob/870905de57f085588c3b718b779d8550aefc5dcf/dependency/catalog_service.go#L18
+# we only allow word characters, dashes & underscores in tags and service name
+SERVICE_NAME_REGEX = re.compile(r'^[\w_-]+$')
+SERVICE_TAG_REGEX = re.compile(r'^\s*(?P<tag>[\w_-]+)\s*$')
+
 Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
 
 
@@ -243,6 +249,21 @@ class ServiceRegistrator:
                 kv[key] = value
         return kv
 
+    @staticmethod
+    def parse_tags_string(container, tags_string):
+        valid_tags = dict()  # we use a dict to preserve tags order, but it emulates a set
+        for tag in tags_string.split(','):
+            if not tag:
+                # skip empty strings. When `tags_string` is empty, `split(',')` will return
+                # at least an empty string
+                continue
+            m = SERVICE_TAG_REGEX.match(tag)
+            if m:
+                valid_tags[m.group('tag')] = True
+            else:
+                log.warning("{}: Invalid tag: '{}', ignoring".format(str(container), tag))
+        return ','.join(valid_tags)
+
     @classmethod
     def parse_service_meta(cls, container):
         # extract SERVICE_* from container env
@@ -262,17 +283,34 @@ class ServiceRegistrator:
         metadata = ContainerMetadata()
         metadata_with_port = dict()
 
+        def validate_kv(key, value):
+            if key == 'NAME':
+                if not SERVICE_NAME_REGEX.match(value):
+                    log.warning("{}: Invalid service name: '{}', ignoring".format(str(container), value))
+                    return None
+                else:
+                    return value
+            elif key == 'TAGS':
+                return cls.parse_tags_string(container, value)
+            else:
+                return value
+
         def parse_service_key(key, value):
+            log.debug("Parsing service key {}: {}".format(key, repr(value)))
             m = SERVICE_PORT_REGEX.match(key)
             if m:
                 # matching SERVICE_<port>_
                 key = m.group('key')
                 port = int(m.group('port'))
-                if port not in metadata_with_port:
-                    metadata_with_port[port] = ContainerMetadata()
-                metadata_with_port[port][key] = value
+                value = validate_kv(key, value)
+                if value:
+                    if port not in metadata_with_port:
+                        metadata_with_port[port] = ContainerMetadata()
+                    metadata_with_port[port][key] = value
             else:
-                metadata[key] = value
+                value = validate_kv(key, value)
+                if value:
+                    metadata[key] = value
 
         # values from env vars take precedence over the ones from labels
         for key, value in kv_from_labels.items():
@@ -301,7 +339,7 @@ class ServiceRegistrator:
             log.debug("skip container {} without exposed ports".format(cid))
             return None
         name = container.name
-        tags = self.context.options['tags'].split(',')
+        tags = self.parse_tags_string(container, self.context.options['tags'])
         container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
                                        self.hostname, self.context.options['ip'], tags)
         if self.context.options['service_prefix']:
