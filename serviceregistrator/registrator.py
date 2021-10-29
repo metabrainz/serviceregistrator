@@ -57,6 +57,11 @@ def health(self):
 
 Container.health = health
 
+# fancier logging, Container.__repr__ is only returning short_id
+# https://github.com/docker/docker-py/blob/a48a5a9647761406d66e8271f19fab7fa0c5f582/docker/models/resource.py#L20
+# Add container name
+Container.__repr__ = lambda self: f"<{self.__class__.__name__}: {self.name} ({self.short_id})>"
+
 
 # Monkey patch default requests user agent
 _USER_AGENT = None
@@ -331,12 +336,12 @@ class ServiceRegistrator:
         metadata, metadata_with_port = self.parse_service_meta(container)
         if not metadata and not metadata_with_port:
             # skip containers without SERVICE_*
-            log.debug("skip container {} without SERVICE_*".format(cid))
+            log.info("skip {}: no SERVICE_*".format(container))
             return None
         ports = self.extract_ports(container)
         if not ports:
             # no exposed or published ports, skip
-            log.debug("skip container {} without exposed ports".format(cid))
+            log.info("skip {}: no exposed ports".format(container))
             return None
         name = container.name
         tags = self.parse_tags_string(container, self.context.options['tags'])
