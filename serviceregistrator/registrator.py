@@ -110,7 +110,8 @@ class ServiceRegistrator:
     }
     register_actions = {
         'health_status: healthy',
-        'start'
+        'start',
+        'unpause',
     }
     handled_actions = unregister_actions | register_actions
 
