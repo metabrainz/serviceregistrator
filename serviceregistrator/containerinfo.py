@@ -49,7 +49,7 @@ class ContainerInfo:
         self._names_count = None
 
     def __str__(self):
-        return f"<{self.name} ({self.cid[:12]})>"
+        return f"<{self.__class__.__name__}: {self.name} ({self.cid[:10]})>"
 
     def __repr__(self):
         return (
