@@ -215,7 +215,16 @@ class ServiceRegistrator:
                     ))
         elif networkmode in ('bridge', 'default'):
             # Extract runtime port mappings, relevant when using --net=bridge
-            port_data = container.attrs['NetworkSettings']['Ports']
+            port_data = None
+            try:
+                port_data = container.attrs['NetworkSettings']['Ports']
+            except KeyError:
+                pass
+            if not port_data:
+                try:
+                    port_data = container.attrs['HostConfig']['PortBindings']
+                except KeyError:
+                    pass
             # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
             #           '80/tcp': [{'HostIp': '0.0.0.0', 'HostPort': '28082'},
             #                      {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}

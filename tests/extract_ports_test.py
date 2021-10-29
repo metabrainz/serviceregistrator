@@ -33,10 +33,20 @@ class TestExtractPortsDefault(unittest.TestCase):
             Ports(internal=80, external=28082, protocol='tcp', ip='0.0.0.0'),
             Ports(internal=80, external=8082, protocol='tcp', ip='0.0.0.0')]))
 
-    def test_extract_ports_no_port(self):
+    def test_extract_ports_no_port_no_bindings(self):
+        self.container.attrs['HostConfig']['PortBindings'] = {}
         self.container.attrs['NetworkSettings']['Ports'] = {}
         ports = ServiceRegistrator.extract_ports(self.container)
         self.assertEqual(ports, [])
+
+    def test_extract_ports_no_port_but_bindings(self):
+        self.container.attrs['HostConfig']['PortBindings'] = self.container.attrs['NetworkSettings']['Ports'].copy()
+        self.container.attrs['NetworkSettings']['Ports'] = {}
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(set(ports), set([
+            Ports(internal=180, external=18082, protocol='udp', ip='127.0.0.1'),
+            Ports(internal=80, external=28082, protocol='tcp', ip='0.0.0.0'),
+            Ports(internal=80, external=8082, protocol='tcp', ip='0.0.0.0')]))
 
 
 class TestExtractPortsBridge(TestExtractPortsDefault):
@@ -44,7 +54,6 @@ class TestExtractPortsBridge(TestExtractPortsDefault):
     def setUp(self):
         super().setUp()
         self.container.attrs['HostConfig']['NetworkMode'] = 'bridge'
-        print(self.container.attrs)
 
 
 class TestExtractPortsOther(TestExtractPortsDefault):
@@ -52,9 +61,18 @@ class TestExtractPortsOther(TestExtractPortsDefault):
     def setUp(self):
         super().setUp()
         self.container.attrs['HostConfig']['NetworkMode'] = 'other'
-        print(self.container.attrs)
 
     def test_extract_ports(self):
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(ports, [])
+
+    def test_extract_ports_no_port_no_bindings(self):
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(ports, [])
+
+    def test_extract_ports_no_port_but_bindings(self):
+        self.container.attrs['HostConfig']['PortBindings'] = self.container.attrs['NetworkSettings']['Ports'].copy()
+        self.container.attrs['NetworkSettings']['Ports'] = {}
         ports = ServiceRegistrator.extract_ports(self.container)
         self.assertEqual(ports, [])
 
