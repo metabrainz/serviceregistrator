@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "serviceregistrator"
-version = "0.3.0"
+version = "0.4.0"
 description = "Bridge betwen docker and consul services, inspired by registrator"
 authors = ["Laurent Monin <zas@metabrainz.org>"]
 license = "GPL-3.0-or-later"
