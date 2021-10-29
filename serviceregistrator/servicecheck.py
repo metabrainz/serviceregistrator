@@ -112,7 +112,7 @@ class ServiceCheck:
             # parameter *header* specifies headers sent in HTTP request. *header*
             # paramater is in form of map of lists of strings,
             # e.g. {"x-foo": ["bar", "baz"]}.
-            url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
+            url = f"{proto}://{service.ip}:{service.port}{path}"
             timeout = cls._value(params, 'timeout')
             interval, deregister = cls._common_values(params)
             tls_skip_verify = cls._bool_value(params, 'tls_skip_verify')

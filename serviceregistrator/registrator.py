@@ -86,7 +86,7 @@ requests.utils.default_user_agent = my_default_user_agent
 
 class ConsulConnectionError(Exception):
     def __init__(self, msg, *args, **kwargs):
-        super().__init__('Consul connection error:  {}'.format(msg), *args, **kwargs)
+        super().__init__(f'Consul connection error: {msg}', *args, **kwargs)
 
 
 SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
@@ -125,7 +125,7 @@ class ServiceRegistrator:
         self._init_docker()
         self.containers = self.context.containers
 
-        log.info("Options: {}".format(context.options))
+        log.info(f"Options: {context.options}")
         self.syncing = False
 
     def _init_docker(self):
@@ -148,13 +148,13 @@ class ServiceRegistrator:
             agent_self = self.consul_client.agent.self()
             self.consul_version = agent_self['Config']['Version']
             ServiceCheck.consul_version = tuple(map(int, self.consul_version.split('.')))
-            log.info("Using Consul Agent {} at {}:{} (peers: {})".format(self.consul_version, host, port, peers))
+            log.info(f"Using Consul Agent {self.consul_version} at {host}:{port} (peers:{peers})")
         except (ConnectionError, ConsulException) as e:
             raise ConsulConnectionError(e)
 
     @staticmethod
     def fmtevent(action, etype, cid):
-        return "Event [{}] type=[{}] cid=[{}]".format(action, etype, cid)
+        return f"Event [{action}] type=[{etype}] cid=[{cid}]"
 
     def watch_events(self):
         debug = self.context.options['debug']
@@ -185,7 +185,7 @@ class ServiceRegistrator:
             container_info = self.parse_container_meta(cid)
             if not container_info:
                 if debug:
-                    log.debug("skipping {} ...".format(cid))
+                    log.debug(f"skipping {cid}")
                 continue
 
             if action in self.register_actions:
@@ -266,7 +266,7 @@ class ServiceRegistrator:
             if m:
                 valid_tags[m.group('tag')] = True
             else:
-                log.warning("{}: Invalid tag: '{}', ignoring".format(str(container), tag))
+                log.warning(f"{container}: Invalid tag: '{tag}', ignoring")
         return ','.join(valid_tags)
 
     @classmethod
@@ -291,7 +291,7 @@ class ServiceRegistrator:
         def validate_kv(key, value):
             if key == 'NAME':
                 if not SERVICE_NAME_REGEX.match(value):
-                    log.warning("{}: Invalid service name: '{}', ignoring".format(str(container), value))
+                    log.warning(f"{container}: Invalid service name: '{value}', ignoring")
                     return None
                 else:
                     return value
@@ -301,7 +301,7 @@ class ServiceRegistrator:
                 return value
 
         def parse_service_key(key, value):
-            log.debug("Parsing service key {}: {}".format(key, repr(value)))
+            log.debug(f"Parsing service key {key}: {value!r}")
             m = SERVICE_PORT_REGEX.match(key)
             if m:
                 # matching SERVICE_<port>_
@@ -336,12 +336,12 @@ class ServiceRegistrator:
         metadata, metadata_with_port = self.parse_service_meta(container)
         if not metadata and not metadata_with_port:
             # skip containers without SERVICE_*
-            log.info("skip {}: no SERVICE_*".format(container))
+            log.info(f"skip {container}: no SERVICE_*")
             return None
         ports = self.extract_ports(container)
         if not ports:
             # no exposed or published ports, skip
-            log.info("skip {}: no exposed ports".format(container))
+            log.info(f"skip {container}: no exposed ports")
             return None
         name = container.name
         tags = self.parse_tags_string(container, self.context.options['tags'])
@@ -370,9 +370,9 @@ class ServiceRegistrator:
             if container_info:
                 self.register_container(container_info)
             elif container_info is not None:
-                log.debug("Skipping {}".format(container_info))
+                log.debug(f"Skipping {container_info}")
             else:
-                log.debug("Skipping {}".format(cid))
+                log.debug(f"Skipping {cid}")
         self.cleanup()
         self.syncing = False
 
@@ -399,10 +399,10 @@ class ServiceRegistrator:
             try:
                 ret = checks[check](service, params)
                 if ret:
-                    log.info("REGISTER CHECK {} for service {}: {}".format(check, service.id, ret))
+                    log.info(f"REGISTER CHECK {check} for service {service.id}: {ret}")
                 return ret
             except Exception as e:
-                log.error("error while setting check {} for service {}: {}".format(check, service.id, e))
+                log.error(f"error while setting check {check} for service {service.id}: {e}")
                 log.error(traceback.format_exc())
         return None
 
@@ -420,7 +420,7 @@ class ServiceRegistrator:
         return meta
 
     def consul_register_service(self, service):
-        log.info("REGISTER SERVICE {}".format(service))
+        log.info(f"REGISTER SERVICE {service}")
         log.debug(repr(service))
         try:
             self.consul_client.agent.service.register(
@@ -439,12 +439,12 @@ class ServiceRegistrator:
 
     def consul_unregister_service(self, service):
         if isinstance(service, Service):
-            log.info("UNREGISTER SERVICE {}".format(service))
+            log.info(f"UNREGISTER SERVICE {service}")
             service_id = service.id
             log.debug(repr(service))
         else:
             service_id = service
-            log.info("UNREGISTER SERVICE with id {}".format(service_id))
+            log.info(f"UNREGISTER SERVICE with id {service_id}")
         try:
             self.consul_client.agent.service.deregister(service_id)
         except ConnectionError as e:
@@ -462,16 +462,16 @@ class ServiceRegistrator:
 
     def register_container(self, container_info):
         if container_info.health is not None and container_info.health != 'healthy':
-            log.info("REGISTER CONTAINER SKIPPED (unhealthy): {}".format(container_info))
+            log.info(f"SKIPPED REGISTER (unhealthy): {container_info}")
             return
-        log.info('REGISTER CONTAINER {}'.format(container_info))
+        log.info(f'REGISTER {container_info}')
         log.debug(repr(container_info))
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
     def unregister_container(self, container_info):
         if container_info.cid in self.containers:
-            log.info('UNREGISTER CONTAINER {}'.format(container_info))
+            log.info(f'UNREGISTER {container_info}')
             log.debug(repr(container_info))
             try:
                 self.unregister_services(container_info)
@@ -479,9 +479,9 @@ class ServiceRegistrator:
                 raise e
             else:
                 del self.containers[container_info.cid]
-                log.info('container {} removed'.format(container_info))
+                log.info(f'container {container_info} removed')
         else:
-            log.debug("no registered container {}".format(container_info))
+            log.debug(f"no registered container {container_info}")
 
     def is_our_identifier(self, serviceid, prefix=''):
         identifier = serviceid.split(':')
@@ -520,14 +520,14 @@ class ServiceRegistrator:
             return {}
 
     def cleanup(self):
-        log.info("cleanup services")
+        log.info("services cleanup")
         registered_services = self.consul_services()
         our_services = self.containers_service_identifiers()
         prefix = self.context.options['service_prefix']
         for serviceid in registered_services:
             is_ours, comment = self.is_our_identifier(serviceid, prefix)
             if not is_ours:
-                log.debug("cleanup: skipping {}, not ours ({})".format(serviceid, comment))
+                log.debug(f"cleanup: skipping {serviceid}, not ours ({comment})")
                 continue
             if serviceid not in our_services:
                 self.consul_unregister_service(serviceid)

@@ -167,7 +167,7 @@ def main(**options):
             log.error(traceback.format_exc())
         finally:
             if not context.kill_now:
-                log.debug("sleeping {} second(s)...".format(delay))
+                log.debug(f"sleeping {delay} second(s)...")
                 for _unused in range(0, delay):
                     if not context.kill_now:
                         sleep(1)

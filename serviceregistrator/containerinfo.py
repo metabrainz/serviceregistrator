@@ -90,9 +90,9 @@ class ContainerInfo:
         if count < 1:
             return None
         elif count > 1:
-            name = '{}-{}'.format(name, port.external)
+            name = f'{name}-{port.external}'
             if port.protocol != 'tcp':
-                name = '{}-{}'.format(name, port.protocol)
+                name = f'{name}-{port.protocol}'
         return name
 
     def build_service_tags(self, port):
@@ -133,7 +133,7 @@ class ContainerInfo:
         for port in self.ports:
             service_name = self.build_service_name(port)
             if service_name is None:
-                log.debug("Skipping port {}, no service name set".format(port))
+                log.debug(f"Skipping port {port}, no service name set")
                 continue
             services.append(
                 Service(

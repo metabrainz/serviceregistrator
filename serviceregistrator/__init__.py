@@ -86,7 +86,7 @@ class Context:
         signal.signal(signal.SIGALRM, self.sync_with_containers)
         resync = float(self.options['resync'])
         if resync > 0.0:
-            log.info("Resync every {} seconds".format(resync))
+            log.info(f"Resync every {resync} seconds")
             signal.setitimer(signal.ITIMER_REAL, resync, resync)
 
     def _log_signal(self, signum):
@@ -96,7 +96,7 @@ class Context:
             self._sig2name = dict([(s.value, s.name) for s in signal.Signals])
 
         name = self._sig2name.get(signum, signum)
-        log.info("Received {} signal".format(name))
+        log.info(f"Received {name} signal")
 
     def ignore_signal(self, signum, frame):
         self._log_signal(signum)
