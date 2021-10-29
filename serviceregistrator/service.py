@@ -35,9 +35,7 @@ class Service:
         self.container_id = container_id
 
     def __str__(self):
-        return '<{} (name:{} ip: {} port: {} tags: {}>'.format(
-            self.id, self.name, self.ip, self.port, self.tags
-        )
+        return f'<{self.__class__.__name__}: {self.id} (name:{self.name} ip:{self.ip} port:{self.port} tags:{self.tags}>'
 
     def __repr__(self):
         return ("{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', "
