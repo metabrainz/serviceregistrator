@@ -84,7 +84,7 @@ POSSIBLE_LEVELS = (
 @click.option(
     '-d',
     '--delay',
-    help="delay in seconds between docker connection attempts",
+    help="delay in seconds between reconnection attempts",
     default=1,
     show_default=True
 )

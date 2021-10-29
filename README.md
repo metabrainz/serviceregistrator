@@ -60,7 +60,7 @@ Options:
   -p, --consul-port INTEGER       consul agent port  [default: 8500]
   -k, --dockersock TEXT           path to docker socket  [default:
                                   /var/run/docker.sock]
-  -d, --delay INTEGER             delay in seconds between docker connection
+  -d, --delay INTEGER             delay in seconds between reconnection
                                   attempts  [default: 1]
   -s, --resync INTEGER            delay between each forced services resync
                                   [default: (disabled)]
