@@ -477,7 +477,7 @@ class ServiceRegistrator:
                 raise e
             else:
                 del self.containers[container_info.cid]
-                log.info(f'container {container_info} removed')
+                log.debug(f'container {container_info} removed')
         else:
             log.debug(f"no registered container {container_info}")
 
