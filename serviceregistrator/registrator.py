@@ -106,10 +106,7 @@ class ServiceRegistrator:
     unregister_actions = {
         'die',
         'health_status: unhealthy',
-        'kill',
-        'oom',
         'pause',
-        'stop',
     }
     register_actions = {
         'health_status: healthy',
