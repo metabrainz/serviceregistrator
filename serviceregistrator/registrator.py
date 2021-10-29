@@ -376,7 +376,8 @@ class ServiceRegistrator:
         self.cleanup()
         self.syncing = False
 
-    def make_check(self, service):
+    @staticmethod
+    def make_check(service):
         checks = {
             'docker': ServiceCheck.docker,
             'http': ServiceCheck.http,
