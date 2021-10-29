@@ -462,16 +462,16 @@ class ServiceRegistrator:
 
     def register_container(self, container_info):
         if container_info.health is not None and container_info.health != 'healthy':
-            log.info(f"SKIPPED REGISTER (unhealthy): {container_info}")
+            log.info(f"SKIPPED CONTAINER (unhealthy): {container_info}")
             return
-        log.info(f'REGISTER {container_info}')
+        log.info(f'REGISTER CONTAINER {container_info}')
         log.debug(repr(container_info))
         self.containers[container_info.cid] = container_info
         self.register_services(container_info)
 
     def unregister_container(self, container_info):
         if container_info.cid in self.containers:
-            log.info(f'UNREGISTER {container_info}')
+            log.info(f'UNREGISTER CONTAINER {container_info}')
             log.debug(repr(container_info))
             try:
                 self.unregister_services(container_info)
