@@ -106,14 +106,12 @@ class ServiceCheck:
         # https://www.consul.io/docs/discovery/checks#http-interval
         path = cls._value(params, proto)
         if path:
-            """
-            Perform a HTTP GET against *url* every *interval* (e.g. "10s") to perfom
-            health check with an optional *timeout* and optional *deregister* after
-            which a failing service will be automatically deregistered. Optional
-            parameter *header* specifies headers sent in HTTP request. *header*
-            paramater is in form of map of lists of strings,
-            e.g. {"x-foo": ["bar", "baz"]}.
-            """
+            # Perform a HTTP GET against *url* every *interval* (e.g. "10s") to perfom
+            # health check with an optional *timeout* and optional *deregister* after
+            # which a failing service will be automatically deregistered. Optional
+            # parameter *header* specifies headers sent in HTTP request. *header*
+            # paramater is in form of map of lists of strings,
+            # e.g. {"x-foo": ["bar", "baz"]}.
             url = "{}://{}:{}{}".format(proto, service.ip, service.port, path)
             timeout = cls._value(params, 'timeout')
             interval, deregister = cls._common_values(params)
@@ -167,12 +165,10 @@ class ServiceCheck:
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
         tcp = cls._bool_value(params, 'tcp')
         if tcp:
-            """
-            Attempt to establish a tcp connection to the specified *host* and
-            *port* at a specified *interval* with optional *timeout* and optional
-            *deregister* after which a failing service will be automatically
-            deregistered.
-            """
+            # Attempt to establish a tcp connection to the specified *host* and
+            # *port* at a specified *interval* with optional *timeout* and optional
+            # *deregister* after which a failing service will be automatically
+            # deregistered.
             host = service.ip
             port = service.port
             interval, deregister = cls._common_values(params)
@@ -195,10 +191,8 @@ class ServiceCheck:
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-ttl-check
         ttl = cls._value(params, 'ttl')
         if ttl:
-            """
-            Set check to be marked as critical after *ttl* (e.g. "10s") unless the
-            check
-            """
+            # Set check to be marked as critical after *ttl* (e.g. "10s") unless the
+            # check
             return Check.ttl(ttl)
         return None
 
@@ -225,9 +219,7 @@ class ServiceCheck:
         # https://www.hashicorp.com/blog/protecting-consul-from-rce-risk-in-specific-configurations
         args = cls._value(params, 'script')
         if args:
-            """
-            Run the script *args* every *interval* (e.g. "10s") to perfom health check
-            """
+            # Run the script *args* every *interval* (e.g. "10s") to perfom health check
             args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             interval = cls._value(params, 'interval')
             if cls.consul_version >= (1, 1, 0):
@@ -256,12 +248,10 @@ class ServiceCheck:
         # NOTE: consul agent should be able to access docker socket: -v /var/run/docker.sock:/var/run/docker.sock
         script = cls._value(params, 'docker')
         if script:
-            """
-            Invoke *script* packaged within a running docker container with
-            *container_id* at a specified *interval* on the configured
-            *shell* using the Docker Exec API.  Optional *register* after which a
-            failing service will be automatically deregistered.
-            """
+            # Invoke *script* packaged within a running docker container with
+            # *container_id* at a specified *interval* on the configured
+            # *shell* using the Docker Exec API.  Optional *register* after which a
+            # failing service will be automatically deregistered.
             script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             container_id = service.container_id[:12]
             shell = cls._value(params, 'shell')
