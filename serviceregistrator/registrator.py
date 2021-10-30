@@ -515,10 +515,10 @@ class ServiceRegistrator:
         return True, None
 
     def containers_service_identifiers(self):
-        services = []
-        for cid, container_info in self.containers.items():
-            services.extend(container_info.service_identifiers())
-        return set(services)
+        services = set()
+        for container_info in self.containers.values():
+            services.update(container_info.service_identifiers())
+        return services
 
     def consul_services(self):
         try:
