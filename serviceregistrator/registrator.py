@@ -409,10 +409,10 @@ class ServiceRegistrator:
             try:
                 ret = checks[check](service, params)
                 if ret:
-                    log.info(f"REGISTER CHECK {check} for service {service.id}: {ret}")
+                    log.info(f"REGISTER CHECK {check} for service {service.id} {ret}")
                 return ret
             except Exception as e:
-                log.error(f"error while setting check {check} for service {service.id}: {e}")
+                log.error(f"error while setting check {check} for service {service.id} : {e}")
                 log.error(traceback.format_exc())
         return None
 
