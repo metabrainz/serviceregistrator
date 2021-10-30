@@ -127,19 +127,20 @@ class ContainerInfo:
 
     @property
     def services(self):
-        if self._services is not None:
-            return self._services
+        if self._services is None:
+            self._names_count = None
 
-        self._names_count = None
-
-        services = list()
-        for port in self.ports:
-            service_name = self.build_service_name(port)
-            if service_name is None:
-                log.debug(f"Skipping port {port}, no service name set")
-                continue
-            services.append(
-                Service(
+            services = dict()
+            for port in self.ports:
+                service_name = self.build_service_name(port)
+                if service_name is None:
+                    log.debug(f"Skipping port {port}, no service name set")
+                    continue
+                if service_name in services:
+                    # this shouldn't happen, but emit a warning and skip if it does
+                    log.warning(f"Service name already exists: {service_name} ({self})")
+                    continue
+                services[service_name] = Service(
                     self.cid,
                     self.build_service_id(port),
                     service_name,
@@ -148,9 +149,8 @@ class ContainerInfo:
                     tags=self.build_service_tags(port),
                     attrs=self.build_service_attrs(port)
                 )
-            )
-        self._services = services
-        return services
+            self._services = list(services.values())
+        return self._services
 
     def service_identifiers(self):
         return [service.id for service in self.services]
