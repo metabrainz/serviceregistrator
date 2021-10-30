@@ -118,7 +118,10 @@ class ContainerInfo:
     def build_service_ip(self, port):
         ip = self.get_attr('ip', port.internal)
         if ip is None:
-            return self.serviceip
+            if port.ip not in {'0.0.0.0', '::', ''}:
+                return port.ip
+            else:
+                return self.serviceip
         else:
             return ip
 

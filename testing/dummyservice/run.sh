@@ -59,7 +59,7 @@ docker run -d \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
 	--hostname "$HOSTNAME" \
 	--name "$NAME" \
-	--publish "${EXTPORT}:${INTPORT}" \
+	--publish "127.0.0.2:${EXTPORT}:${INTPORT}" \
 	dummyservice
 
 NAME="dummyservice_checkscript"
