@@ -232,6 +232,9 @@ class ServiceRegistrator:
                 for internal_port, external_ports in port_data.items():
                     port, protocol = internal_port.split('/')
                     for eport in external_ports:
+                        if ':' in eport['HostIp']:
+                            # FIXME: IPv6 addresses aren't supported yet
+                            continue
                         ports.append(Ports(
                             internal=int(port),
                             external=int(eport['HostPort']),
