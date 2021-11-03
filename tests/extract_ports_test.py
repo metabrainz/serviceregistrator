@@ -2,6 +2,32 @@ import unittest
 from serviceregistrator.registrator import ServiceRegistrator, Ports
 
 
+class TestExtractPortsExposedNotUsed(unittest.TestCase):
+    def setUp(self):
+        class DummyContainer:
+            attrs = {
+                'NetworkSettings': {
+                    'Ports': {
+                        '9200/tcp': [
+                            {'HostIp': '0.0.0.0', 'HostPort': '65423'},
+                            {'HostIp': '::', 'HostPort': '65423'}
+                        ],
+                        '9300/tcp': None   # this happens when port is exposed in Dockerfile, but not published
+                    }
+                },
+                'HostConfig': {
+                    "NetworkMode": "default",
+                }
+            }
+        self.container = DummyContainer()
+
+    def test_extract_ports(self):
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(set(ports), set([
+            Ports(internal=9200, external=65423, protocol='tcp', ip='0.0.0.0')
+        ]))
+
+
 class TestExtractPortsDefault(unittest.TestCase):
     def setUp(self):
         class DummyContainer:

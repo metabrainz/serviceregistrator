@@ -233,6 +233,10 @@ class ServiceRegistrator:
             #                      {'HostIp': '0.0.0.0', 'HostPort': '8082'}]}
             if port_data:
                 for internal_port, external_ports in port_data.items():
+                    if not external_ports:
+                        # a port can be exposed in Dockerfile, but not published
+                        # so "9300/tcp": None is possible
+                        continue
                     port, protocol = internal_port.split('/')
                     for eport in external_ports:
                         if ':' in eport['HostIp']:
