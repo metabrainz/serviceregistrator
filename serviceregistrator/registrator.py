@@ -205,6 +205,7 @@ class ServiceRegistrator:
             # Extract configured host port mappings, relevant when using --net=host
             exposed_ports = container.attrs['Config']['ExposedPorts']
             if exposed_ports:
+                log.debug(f"Config ExposedPorts {container}: {exposed_ports!r}")
                 for exposed_port in exposed_ports:
                     port, protocol = exposed_port.split('/')
                     ports.append(Ports(
@@ -218,11 +219,13 @@ class ServiceRegistrator:
             port_data = None
             try:
                 port_data = container.attrs['NetworkSettings']['Ports']
+                log.debug(f"NetworkSettings Ports {container}: {port_data!r}")
             except KeyError:
                 pass
             if not port_data:
                 try:
                     port_data = container.attrs['HostConfig']['PortBindings']
+                    log.debug(f"HostConfig PortBindings {container}: {port_data!r}")
                 except KeyError:
                     pass
             # example: {'180/udp': [{'HostIp': '0.0.0.0', 'HostPort': '18082'}],
@@ -348,7 +351,11 @@ class ServiceRegistrator:
             # skip containers without SERVICE_*
             log.info(f"skip {container}: no SERVICE_*")
             return None
-        ports = self.extract_ports(container)
+        try:
+            ports = self.extract_ports(container)
+        except Exception as e:
+            log.critical(f"Couldn't extract port from {container} metadata: {e}")
+            return None
         if not ports:
             # no exposed or published ports, skip
             log.info(f"skip {container}: no exposed ports")
