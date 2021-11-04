@@ -137,7 +137,19 @@ encodes useful information in the ID based on this pattern:
 
 ### Docker
 
-#### Host mode:
+
+Docker hub: https://hub.docker.com/repository/docker/metabrainz/serviceregistrator
+
+Image tags:
+
+  - latest: points to latest released version (vA.B.C)
+  - vA.B.C: released version
+  - edge: latest build
+
+Images are automatically built and pushed using Git Workflow (in this repo).
+
+
+#### Running (Host mode):
 
 ```bash
 docker run \
@@ -152,7 +164,7 @@ docker run \
 	--consul-host localhost
 ```
 
-#### Network bridge mode:
+#### Running (Network bridge mode):
 
 ```bash
 docker run \
