@@ -91,7 +91,7 @@ class ConsulConnectionError(Exception):
 
 SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
 SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
-SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>.+)=(?P<value>.*)$')
+SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>[^=]+)=(?P<value>.*)$')
 
 # https://www.consul.io/docs/discovery/services#service-and-tag-names-with-dns
 # https://github.com/hashicorp/consul-template/blob/870905de57f085588c3b718b779d8550aefc5dcf/dependency/catalog_service.go#L18
