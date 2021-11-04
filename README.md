@@ -110,8 +110,10 @@ ServiceRegistrator will only pick up services from containers that
 have *explicitly published ports* (eg, using `-p` or `-P`).
 For containers running in host network mode, it will pick *exposed ports*.
 
+**IMPORTANT**:
 If no `SERVICE_NAME` or matching `SERVICE_<port>_NAME` can be found, service
 will be skipped.
+That's a main difference with registrator which registers everything it finds.
 
 ### IP
 
