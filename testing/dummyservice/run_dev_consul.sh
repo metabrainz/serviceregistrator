@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ ! -z "$1"]; then
+if [ ! -z "$1" ]; then
 	CONSUL_IMAGE_VERSION=$1
 else
 	CONSUL_IMAGE_VERSION=latest
