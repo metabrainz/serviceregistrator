@@ -83,6 +83,7 @@ docker rm -f "$NAME"
 docker run -d \
 	--env "SERVICE_${INTPORT}_CHECK_SCRIPT=date --date='@2147483647'" \
 	--env "SERVICE_${INTPORT}_CHECK_TIMEOUT=10s" \
+	--env "SERVICE_${INTPORT}_CHECK_INITIAL_STATUS=passing" \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
 	--hostname "$HOSTNAME" \
 	--name "$NAME" \

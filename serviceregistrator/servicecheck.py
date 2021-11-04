@@ -37,6 +37,7 @@ class ServiceCheck:
         'https': '',
         'http_method': None,
         'https_method': None,
+        'initial_status': None,
         'interval': '10s',
         'shell': '/bin/sh',
         'script': None,
@@ -72,6 +73,15 @@ class ServiceCheck:
     def _bool_value(cls, params, key):
         value = cls._value(params, key)
         return value and value.lower() == 'true'
+
+    @classmethod
+    def _post_process(cls, checkret, params):
+        # https://www.consul.io/api-docs/agent/check#status
+        # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/backends.md#consul-initial-health-check-status
+        initial_status = cls._value(params, 'initial_status')
+        if initial_status:
+            checkret['Status'] = initial_status
+        return checkret
 
     @classmethod
     def _http(cls, service, params, proto='http'):
@@ -137,7 +147,7 @@ class ServiceCheck:
                 # https://github.com/hashicorp/consul/pull/6602
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#170-february-11-2020
                 ret['Body'] = body
-            return ret
+            return cls._post_process(ret, params)
         return None
 
     @classmethod
@@ -173,7 +183,8 @@ class ServiceCheck:
             port = service.port
             interval, deregister = cls._common_values(params)
             timeout = cls._value(params, 'timeout')
-            return Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
+            ret = Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
+            return cls._post_process(ret, params)
         return None
 
     @classmethod
@@ -193,7 +204,8 @@ class ServiceCheck:
         if ttl:
             # Set check to be marked as critical after *ttl* (e.g. "10s") unless the
             # check
-            return Check.ttl(ttl)
+            ret = Check.ttl(ttl)
+            return cls._post_process(ret, params)
         return None
 
     @classmethod
@@ -224,7 +236,8 @@ class ServiceCheck:
             interval = cls._value(params, 'interval')
             if cls.consul_version >= (1, 1, 0):
                 args = args.split(' ')
-                return Check.script(args, interval)
+                ret = Check.script(args, interval)
+                return cls._post_process(ret, params)
             else:
                 # compat
                 # https://github.com/cablehead/python-consul/commit/f405dee1beb6019986307c121702d2e9ad40bcda
@@ -232,7 +245,7 @@ class ServiceCheck:
                 ret = Check.script(args, interval)
                 ret['script'] = args
                 del ret['args']
-                return ret
+                return cls._post_process(ret, params)
         return None
 
     @classmethod
@@ -263,5 +276,5 @@ class ServiceCheck:
             if cls.consul_version >= (1, 1, 0):
                 ret['args'] = script.split(" ")
                 del ret['script']
-            return ret
+            return cls._post_process(ret, params)
         return None

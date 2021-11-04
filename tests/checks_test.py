@@ -74,6 +74,7 @@ class TestServiceCheckHttp(unittest.TestCase):
             'http_method': 'head',
             'body': 'bodycontent',
             'deregister': '666s',
+            'initial_status': 'passing',
         }
 
         self.params_https = {
@@ -95,7 +96,8 @@ class TestServiceCheckHttp(unittest.TestCase):
         self.assertEqual(check['Method'], 'HEAD')
         self.assertEqual(check['Body'], params['body'])
         self.assertEqual(check['DeregisterCriticalServiceAfter'], '666s')
-        self.assertEqual(len(check), 7)
+        self.assertEqual(check['Status'], 'passing')
+        self.assertEqual(len(check), 8)
 
     def test_check_http_no_path(self):
         params = self.params_http
