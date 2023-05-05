@@ -11,7 +11,7 @@ ENV \
   PIP_DISABLE_PIP_VERSION_CHECK=on \
   PIP_DEFAULT_TIMEOUT=100 \
   # poetry:
-  POETRY_VERSION=1.1.11 \
+  POETRY_VERSION=1.4.2 \
   POETRY_NO_INTERACTION=1 \
   POETRY_VIRTUALENVS_CREATE=false \
   POETRY_CACHE_DIR='/var/cache/pypoetry' \
@@ -28,12 +28,12 @@ RUN apt-get update \
 
 # Installing `poetry` package manager:
 # https://github.com/python-poetry/poetry
-RUN curl -sSL 'https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py' | python - \
+RUN curl -sSL https://install.python-poetry.org | python - \
   && poetry --version
 
 WORKDIR /code
 COPY . /code/
 
-RUN poetry install --no-interaction --no-ansi --no-dev
+RUN poetry install --no-interaction --no-ansi --only main
 
 ENTRYPOINT ["serviceregistrator"]
