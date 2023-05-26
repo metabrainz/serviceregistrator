@@ -22,6 +22,7 @@
 from consul import Check
 import json
 import logging
+import shlex
 
 
 log = logging.getLogger('serviceregistrator')
@@ -235,8 +236,7 @@ class ServiceCheck:
             args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
             interval = cls._value(params, 'interval')
             if cls.consul_version >= (1, 1, 0):
-                args = args.split(' ')
-                ret = Check.script(args, interval)
+                ret = Check.script(shlex.split(args), interval)
                 return cls._post_process(ret, params)
             else:
                 # compat
@@ -274,7 +274,7 @@ class ServiceCheck:
             # it was removed in consul 1.1.0
             # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#110-may-11-2018
             if cls.consul_version >= (1, 1, 0):
-                ret['args'] = script.split(" ")
+                ret['args'] = shlex.split(script)
                 del ret['script']
             return cls._post_process(ret, params)
         return None
