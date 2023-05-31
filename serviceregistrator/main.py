@@ -151,14 +151,16 @@ def main(**options):
         http.client.HTTPConnection.debuglevel = 1
 
     while not context.kill_now:
+        sleep_delay = 1
         try:
             context.serviceregistrator = ServiceRegistrator(context)
             consul_connected = True
             context.serviceregistrator.sync_with_containers()
             context.serviceregistrator.watch_events()
         except ConsulConnectionError as e:
-            if consul_connected:
-                log.error(e)
+            if not consul_connected:
+                sleep_delay = 5
+            log.error(e)
             consul_connected = False
         except docker.errors.DockerException as e:
             log.error(e)
@@ -170,7 +172,7 @@ def main(**options):
                 log.debug(f"sleeping {delay} second(s)...")
                 for _unused in range(0, delay):
                     if not context.kill_now:
-                        sleep(1)
+                        sleep(sleep_delay)
 
 
 if __name__ == "__main__":
