@@ -134,7 +134,7 @@ class ContainerInfo:
             for port in self.ports:
                 service_name = self.build_service_name(port)
                 if service_name is None:
-                    log.debug(f"Skipping port {port}, no service name set")
+                    log.info(f"Skipping port {port}, no service name set")
                     continue
                 if service_name in services:
                     # this shouldn't happen, but emit a warning and skip if it does
