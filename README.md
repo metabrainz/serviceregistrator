@@ -89,7 +89,8 @@ object into a particular registry.
 
 The fields `Name`, `Tags`, `Attrs`, and `ID` can be overridden by user-defined
 container metadata. You can use environment variables or labels prefixed with
-`SERVICE_` or `SERVICE_x_` to set values, where `x` is the internal exposed port.
+`SERVICE_` or `SERVICE_<port>_` to set values, where `<port>` is the **internal**
+exposed port number.
 For example `SERVICE_NAME=customerdb` and `SERVICE_80_NAME=api`.
 
 You use a port in the key name to refer to a particular service on that port.
