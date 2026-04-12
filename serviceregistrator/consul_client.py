@@ -31,11 +31,14 @@ class ConsulAPIError(Exception):
 
 
 class ConsulClient:
+    DEFAULT_TIMEOUT = 30
+
     def __init__(self, host: str = "127.0.0.1", port: int = 8500) -> None:
         self.base_url = f"http://{host}:{port}/v1"
 
     def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         url = f"{self.base_url}{path}"
+        kwargs.setdefault("timeout", self.DEFAULT_TIMEOUT)
         resp = requests.request(method, url, **kwargs)
         resp.raise_for_status()
         return resp
