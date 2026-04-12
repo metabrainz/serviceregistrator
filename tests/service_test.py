@@ -17,11 +17,9 @@ class TestService(unittest.TestCase):
         assert "myid" in result
 
     def test_defaults_none_tags(self):
-        # Documents the existing bug: `if not None` is always False
         s = Service("cid", "id", "name", "0.0.0.0", 80)
-        # Due to the bug, tags/attrs will be None, not [] / {}
-        assert s.tags is None
-        assert s.attrs is None
+        assert s.tags == []
+        assert s.attrs == {}
 
     def test_explicit_tags_attrs(self):
         s = Service("cid", "id", "name", "0.0.0.0", 80, tags=["a"], attrs={"k": "v"})

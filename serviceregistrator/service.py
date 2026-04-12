@@ -28,9 +28,9 @@ class Service:
         self.ip = ip  # string               // IP address service is located at
         self.port = port  # int                  // port service is listening on
         # []string             // extra tags to classify service
-        self.tags = tags if not None else []
+        self.tags = tags if tags is not None else []
         #  map[string]string    // extra attribute metadata
-        self.attrs = attrs if not None else dict()
+        self.attrs = attrs if attrs is not None else dict()
         self.container_id = container_id
 
     def __str__(self):
