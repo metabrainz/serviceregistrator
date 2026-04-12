@@ -36,6 +36,12 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W"]
 
+[tool.pytest.ini_options]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: require Docker and Consul (deselected by default)",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
