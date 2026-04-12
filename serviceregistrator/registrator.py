@@ -502,13 +502,9 @@ class ServiceRegistrator:
         if container_info.cid in self.containers:
             log.info(f"UNREGISTER CONTAINER {container_info}")
             log.debug(repr(container_info))
-            try:
-                self.unregister_services(container_info)
-            except Exception as e:
-                raise e
-            else:
-                del self.containers[container_info.cid]
-                log.debug(f"container {container_info} removed")
+            self.unregister_services(container_info)
+            del self.containers[container_info.cid]
+            log.debug(f"container {container_info} removed")
         else:
             log.debug(f"no registered container {container_info}")
 
