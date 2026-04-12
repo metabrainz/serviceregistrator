@@ -17,6 +17,41 @@ uv sync
 uv run serviceregistrator --help
 ```
 
+## Tests
+
+Unit tests:
+
+```bash
+uv run pytest tests/
+```
+
+Integration tests (require Docker and pull a Consul image):
+
+```bash
+uv run pytest -m integration -v
+```
+
+All tests:
+
+```bash
+uv run pytest -m '' -v
+```
+
+Lint, format, and type checks:
+
+```bash
+uv run ruff check serviceregistrator tests
+uv run ruff format --check serviceregistrator tests
+uvx ty@0.0.29 check serviceregistrator
+```
+
+Manual end-to-end testing (see `testing/README.md`):
+
+```bash
+cd testing/dummyservice
+./run_all.sh
+```
+
 ## Running in a docker container
 
 ### Build Image
