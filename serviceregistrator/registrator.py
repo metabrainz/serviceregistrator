@@ -130,7 +130,6 @@ class ServiceRegistrator:
 
     def _init_docker(self) -> None:
         self.docker_client = docker.from_env()
-        self.docker_api_client = docker.APIClient(base_url="unix://" + self.context.options["dockersock"])
         self.events = self.docker_client.events(decode=True)
 
         def close_events():

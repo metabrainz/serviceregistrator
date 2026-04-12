@@ -555,14 +555,9 @@ class TestInitDocker(unittest.TestCase):
     def test_init_docker(self):
         sr = make_registrator()
         mock_client = Mock()
-        mock_api = Mock()
-        with (
-            patch("serviceregistrator.registrator.docker.from_env", return_value=mock_client),
-            patch("serviceregistrator.registrator.docker.APIClient", return_value=mock_api),
-        ):
+        with patch("serviceregistrator.registrator.docker.from_env", return_value=mock_client):
             sr._init_docker()
         assert sr.docker_client is mock_client
-        assert sr.docker_api_client is mock_api
         # Verify close_events was registered
         sr.context.register_on_exit.assert_called()
 
