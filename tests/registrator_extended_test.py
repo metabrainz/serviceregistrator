@@ -19,7 +19,7 @@ def make_registrator(**ctx_overrides):
         context.options = {
             "debug": False,
             "tags": "",
-            "ip": "127.0.0.1",
+            "ip": [("127.0.0.1", None)],
             "service_prefix": None,
             "consul_host": "127.0.0.1",
             "consul_port": 8500,

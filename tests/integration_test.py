@@ -99,7 +99,7 @@ def _make_sr(prefix):
     from serviceregistrator.registrator import ServiceRegistrator
 
     options = {
-        "ip": "127.0.0.1",
+        "ip": [("127.0.0.1", None)],
         "tags": "",
         "consul_host": "127.0.0.1",
         "consul_port": CONSUL_PORT,

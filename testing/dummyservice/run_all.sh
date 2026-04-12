@@ -79,7 +79,7 @@ done
 
 echo "=== Starting serviceregistrator ==="
 cd "$PROJECT_DIR"
-uv run serviceregistrator --ip 127.0.0.1 --loglevel DEBUG > "$LOG" 2>&1 &
+uv run serviceregistrator --ip 127.0.0.1@physical --ip 127.0.0.2@virtual --loglevel DEBUG > "$LOG" 2>&1 &
 SR_PID=$!
 sleep 2
 
@@ -210,17 +210,24 @@ check "Dual-IP: 127.0.0.1 registered" sh -c "echo '$DUALIP_IPS' | grep -q '127.0
 check "Dual-IP: 127.0.0.2 registered" sh -c "echo '$DUALIP_IPS' | grep -q '127.0.0.2'"
 
 echo ""
-echo "=== Test: all-interfaces binding (0.0.0.0, uses --ip default) ==="
+echo "=== Test: all-interfaces binding expands to multiple IPs with tags ==="
 docker rm -f dummyservice_allif 2>/dev/null || true
 docker run -d --name dummyservice_allif \
     --env "SERVICE_80_NAME=dummyservice_allif" \
     --publish "8091:80" \
     dummyservice >/dev/null
-wait_for_log "REGISTER.*dummyservice_allif"
+wait_for_log "REGISTER.*dummyservice_allif" 10
+sleep 2
 SERVICES=$(curl -sf http://127.0.0.1:$CONSUL_PORT/v1/agent/services)
-ALLIF_IP=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((v['Address'] for v in d.values() if 'dummyservice_allif' in v.get('Service','')), 'none'))")
-echo "  INFO: all-interfaces container registered with IP: $ALLIF_IP"
-check "All-interfaces: uses --ip default (127.0.0.1)" sh -c "[ '$ALLIF_IP' = '127.0.0.1' ]"
+ALLIF_COUNT=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(1 for v in d.values() if v.get('Service','') == 'dummyservice_allif'))")
+echo "  INFO: registered $ALLIF_COUNT service(s) for all-interfaces container"
+ALLIF_IPS=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(' '.join(sorted(v['Address'] for v in d.values() if v.get('Service','') == 'dummyservice_allif')))")
+echo "  INFO: registered IPs: $ALLIF_IPS"
+ALLIF_TAGS=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); tags=[t for v in d.values() if v.get('Service','') == 'dummyservice_allif' for t in v.get('Tags',[])]; print(' '.join(sorted(set(tags))))")
+echo "  INFO: tags: $ALLIF_TAGS"
+check "All-interfaces: both IPs registered" sh -c "[ $ALLIF_COUNT -eq 2 ]"
+check "All-interfaces: physical tag present" sh -c "echo '$ALLIF_TAGS' | grep -q 'physical'"
+check "All-interfaces: virtual tag present" sh -c "echo '$ALLIF_TAGS' | grep -q 'virtual'"
 
 echo ""
 echo "=== Test: container removal triggers unregister ==="

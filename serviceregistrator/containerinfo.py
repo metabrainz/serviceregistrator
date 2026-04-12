@@ -43,19 +43,28 @@ class ContainerInfo:
         metadata: Any,
         metadata_with_port: dict[int, Any],
         hostname: str,
-        serviceip: str,
+        service_ips: list[tuple[str, str | None]],
         tags: list[str],
     ) -> None:
         self.cid = cid
         self.name = name
-        self.ports = ports
         self.metadata = metadata
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
-        self.serviceip = serviceip
+        self.service_ips = service_ips
+        self.ip_tag_map: dict[str, str] = {ip: tag for ip, tag in service_ips if tag}
         self.service_prefix: str | None = None
         self.tags = [x for x in set(tags) if x]
         self.health: str | None = None
+
+        # Expand wildcard bindings (0.0.0.0, ::, "") into one port per --ip
+        self.ports: list[Any] = []
+        for port in ports:
+            if port.ip in {"0.0.0.0", "::", ""}:
+                for ip, _tag in service_ips:
+                    self.ports.append(port._replace(ip=ip))
+            else:
+                self.ports.append(port)
 
         self._services: list[Service] | None = None
         self._names_count: dict[str | None, int] | None = None
@@ -66,7 +75,7 @@ class ContainerInfo:
     def __repr__(self) -> str:
         return (
             "{t}('{s.cid}', '{s.name}', {s.ports}, {s.metadata}, {s.metadata_with_port}, "
-            "'{s.hostname}', '{s.serviceip}', {s.tags})"
+            "'{s.hostname}', {s.service_ips}, {s.tags})"
         ).format(t=type(self).__name__, s=self)
 
     def __bool__(self) -> bool:
@@ -112,12 +121,15 @@ class ContainerInfo:
                 name = f"{name}-{port.protocol}"
         return name
 
-    def build_service_tags(self, port: Any) -> list[str]:
+    def build_service_tags(self, port: Any, ip: str) -> list[str]:
         tags = list(self.get_attr("tags", port.internal) or [])
         if self.tags:
             tags.extend(self.tags)
         if port.protocol != "tcp":
             tags.append(port.protocol)
+        ip_tag = self.ip_tag_map.get(ip)
+        if ip_tag:
+            tags.append(ip_tag)
         return [x for x in set(tags) if x]
 
     def build_service_attrs(self, port: Any) -> dict[str, str]:
@@ -159,15 +171,12 @@ class ContainerInfo:
     def build_service_ip(self, port: Any) -> str:
         ip = self.get_attr("ip", port.internal)
         if ip is None:
-            if port.ip not in {"0.0.0.0", "::", ""}:
-                return port.ip
-            else:
-                return self.serviceip
+            return port.ip
         elif self._validate_ip(ip):
             return ip
         else:
             log.warning(f"Invalid SERVICE_IP '{ip}' for {self}, using default")
-            return self.serviceip
+            return self.service_ips[0][0]
 
     def build_service_alias(self, port: Any) -> str | None:
         attrs = self.build_service_attrs(port)
@@ -195,7 +204,7 @@ class ContainerInfo:
                     service_name,
                     ip,
                     port.external,
-                    tags=self.build_service_tags(port),
+                    tags=self.build_service_tags(port, ip),
                     attrs=self.build_service_attrs(port),
                 )
                 services[service_id] = service

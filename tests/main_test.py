@@ -1,6 +1,6 @@
 import unittest
 from click.testing import CliRunner
-from serviceregistrator.main import main, loglevelfmt, validate_ip
+from serviceregistrator.main import main, loglevelfmt, validate_ip, parse_ip_tags
 
 
 class TestLogLevelFmt(unittest.TestCase):
