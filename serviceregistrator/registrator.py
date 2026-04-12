@@ -512,11 +512,6 @@ class ServiceRegistrator:
         else:
             log.debug(f"no registered container {container_info}")
 
-    @staticmethod
-    def _is_ip_hash(s: str) -> bool:
-        """Check if a string looks like an 8-char hex IP hash."""
-        return len(s) == 8 and all(c in "0123456789abcdef" for c in s)
-
     def is_our_identifier(self, serviceid: str, prefix: str = "") -> tuple[bool, str | None]:
         identifier = serviceid.split(":")
         length = len(identifier)
@@ -528,11 +523,12 @@ class ServiceRegistrator:
                 length -= 1
         if length < 3:
             return False, "length < 3"
-        # Strip known suffixes: :udp, :alias, :iphash
+        # Strip known suffixes: :udp, :alias
         while length > 3 and identifier[-1] in ("udp", "alias"):
             identifier = identifier[:-1]
             length -= 1
-        if length > 3 and self._is_ip_hash(identifier[-1]):
+        # Strip one optional IP tag or hash suffix
+        if length == 4:
             identifier = identifier[:-1]
             length -= 1
         if length > 3:

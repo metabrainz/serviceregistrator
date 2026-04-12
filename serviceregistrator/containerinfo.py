@@ -156,7 +156,8 @@ class ContainerInfo:
         if port.protocol != "tcp":
             parts.append(str(port.protocol))
         if self._has_multiple_ips(port):
-            parts.append(self._ip_hash(ip))
+            tag = self.ip_tag_map.get(ip)
+            parts.append(tag if tag else self._ip_hash(ip))
         return self.SERVICE_ID_SEPARATOR.join(parts)
 
     @staticmethod
