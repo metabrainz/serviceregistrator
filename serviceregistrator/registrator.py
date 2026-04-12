@@ -24,6 +24,7 @@ from docker.models.containers import Container
 from typing import Any
 import copy
 import docker
+import docker.errors
 import logging
 import traceback
 import re
@@ -348,7 +349,11 @@ class ServiceRegistrator:
         return metadata, new_metadata_with_port
 
     def parse_container_meta(self, cid: str) -> ContainerInfo | None:
-        container = self.docker_get_container_by_id(cid)
+        try:
+            container = self.docker_get_container_by_id(cid)
+        except docker.errors.NotFound:
+            log.debug(f"Container {cid[:12]} not found (already removed?)")
+            return None
         metadata, metadata_with_port = self.parse_service_meta(container)
         if not metadata and not metadata_with_port:
             # skip containers without SERVICE_*

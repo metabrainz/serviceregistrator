@@ -206,6 +206,14 @@ class TestWatchEvents(unittest.TestCase):
 
 
 class TestParseContainerMeta(unittest.TestCase):
+    def test_container_not_found(self):
+        sr = make_registrator()
+        import docker.errors
+
+        sr.docker_get_container_by_id = Mock(side_effect=docker.errors.NotFound("gone"))
+        result = sr.parse_container_meta("cid123")
+        assert result is None
+
     def test_no_service_metadata(self):
         sr = make_registrator()
         container = Mock()
