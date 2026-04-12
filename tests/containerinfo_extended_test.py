@@ -209,3 +209,20 @@ class TestBuildServiceAlias(unittest.TestCase):
         alias = [s for s in ci.services if s.name == "alias-svc"][0]
         assert "prod" in alias.tags
         assert "db" in alias.tags
+
+    def test_alias_name_collision_with_service_name(self):
+        """Alias name same as another service name — alias is skipped."""
+        ci = ContainerInfo(
+            "cid",
+            "name",
+            [Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0")],
+            ContainerMetadata(),
+            {80: ContainerMetadata({"name": "real-svc", "alias": "real-svc"})},
+            "host",
+            "127.0.0.1",
+            [],
+        )
+        services = ci.services
+        assert len(services) == 1
+        assert services[0].name == "real-svc"
+        assert services[0].alias_of is None
