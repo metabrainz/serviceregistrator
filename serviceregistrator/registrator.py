@@ -513,7 +513,9 @@ class ServiceRegistrator:
             log.debug(f"no registered container {container_info}")
 
     def is_our_identifier(self, serviceid: str, prefix: str = "") -> tuple[bool, str | None]:
-        identifier = serviceid.split(":")
+        # Strip @tag suffix (IP tag or hash) before parsing
+        base = serviceid.split("@")[0]
+        identifier = base.split(":")
         length = len(identifier)
         if prefix:
             if identifier[0] != prefix:
@@ -525,10 +527,6 @@ class ServiceRegistrator:
             return False, "length < 3"
         # Strip known suffixes: :udp, :alias
         while length > 3 and identifier[-1] in ("udp", "alias"):
-            identifier = identifier[:-1]
-            length -= 1
-        # Strip one optional IP tag or hash suffix
-        if length == 4:
             identifier = identifier[:-1]
             length -= 1
         if length > 3:

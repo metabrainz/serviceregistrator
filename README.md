@@ -337,10 +337,10 @@ Common check options:
 
 The service ID is a cluster-wide unique identifier generated automatically:
 
-    <hostname>:<container-name>:<exposed-port>[:udp if udp][:tag if tagged]
+    <hostname>:<container-name>:<exposed-port>[:udp if udp][:alias if alias][@tag if tagged]
 
 When an `--ip` tag is set, it is appended to the ID (e.g.,
-`host:myapp:8080:physical`). This is mostly an implementation detail — you
+`host:myapp:8080@physical`). This is mostly an implementation detail — you
 typically use service names, not IDs.
 
 ### Docker

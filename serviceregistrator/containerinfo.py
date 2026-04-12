@@ -148,6 +148,8 @@ class ContainerInfo:
         )
         return count > 0
 
+    SERVICE_ID_TAG_SEPARATOR = "@"
+
     def build_service_id(self, port: Any, ip: str) -> str:
         parts: list[str] = []
         if self.service_prefix:
@@ -155,12 +157,13 @@ class ContainerInfo:
         parts.extend([self.hostname, self.name, str(port.external)])
         if port.protocol != "tcp":
             parts.append(str(port.protocol))
+        base = self.SERVICE_ID_SEPARATOR.join(parts)
         tag = self.ip_tag_map.get(ip)
         if tag:
-            parts.append(tag)
+            return base + self.SERVICE_ID_TAG_SEPARATOR + tag
         elif self._has_multiple_ips(port):
-            parts.append(self._ip_hash(ip))
-        return self.SERVICE_ID_SEPARATOR.join(parts)
+            return base + self.SERVICE_ID_TAG_SEPARATOR + self._ip_hash(ip)
+        return base
 
     @staticmethod
     def _validate_ip(ip: str) -> bool:
@@ -215,7 +218,12 @@ class ContainerInfo:
                 # Create alias service if SERVICE_<port>_ALIAS is set
                 alias_name = self.build_service_alias(port)
                 if alias_name:
-                    alias_id = service_id + self.SERVICE_ID_SEPARATOR + "alias"
+                    # Insert :alias before @tag so is_our_identifier can parse both
+                    if self.SERVICE_ID_TAG_SEPARATOR in service_id:
+                        base, tag_part = service_id.split(self.SERVICE_ID_TAG_SEPARATOR, 1)
+                        alias_id = base + self.SERVICE_ID_SEPARATOR + "alias" + self.SERVICE_ID_TAG_SEPARATOR + tag_part
+                    else:
+                        alias_id = service_id + self.SERVICE_ID_SEPARATOR + "alias"
                     if alias_id in services:
                         log.warning(f"Alias ID already exists: {alias_id} ({self})")
                     else:

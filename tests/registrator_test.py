@@ -55,10 +55,16 @@ class TestIsOurIdentifier(unittest.TestCase):
         self.assertIsNone(comment)
 
     def test_4elems_same_hostname_same_prefix_tag(self):
-        """A single extra suffix (IP tag or hash) is accepted."""
-        yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z:physical", prefix="abc")
+        """IP tag (after @) is stripped before parsing."""
+        yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z@physical", prefix="abc")
         self.assertTrue(yes)
         self.assertIsNone(comment)
+
+    def test_4elems_same_hostname_same_prefix_unknown_suffix(self):
+        """An unknown : suffix is rejected."""
+        yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z:unknown", prefix="abc")
+        self.assertFalse(yes)
+        self.assertEqual(comment, "unexpected suffix")
 
     def test_5elems_same_hostname_same_prefix_too_many(self):
         """Two unknown suffixes are rejected."""
@@ -74,6 +80,14 @@ class TestIsOurIdentifier(unittest.TestCase):
     def test_4elems_same_hostname_same_prefix_alias(self):
         yes, comment = self.registrator.is_our_identifier(
             "abc:" + self.registrator.hostname + ":y:z:alias", prefix="abc"
+        )
+        self.assertTrue(yes)
+        self.assertIsNone(comment)
+
+    def test_alias_with_tag(self):
+        """alias:alias@tag — both :alias and @tag are handled."""
+        yes, comment = self.registrator.is_our_identifier(
+            "abc:" + self.registrator.hostname + ":y:z:alias@physical", prefix="abc"
         )
         self.assertTrue(yes)
         self.assertIsNone(comment)
