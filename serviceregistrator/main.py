@@ -22,6 +22,7 @@
 import click
 import docker
 import docker.errors
+import ipaddress
 import logging
 import traceback
 from time import sleep
@@ -38,6 +39,14 @@ def loglevelfmt(ctx, param, value):
         return value.upper()
 
 
+def validate_ip(ctx, param, value):
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        raise click.BadParameter(f"invalid IP address: {value}")
+    return value
+
+
 POSSIBLE_LEVELS = (
     "CRITICAL",
     "ERROR",
@@ -48,7 +57,7 @@ POSSIBLE_LEVELS = (
 
 
 @click.command()
-@click.option("-i", "--ip", help="address to use for services without SERVICE_IP", required=True)
+@click.option("-i", "--ip", help="address to use for services without SERVICE_IP", required=True, callback=validate_ip)
 @click.option("-t", "--tags", help="comma-separated list of tags to append to all registered services", default="")
 @click.option("-h", "--consul-host", help="consul agent host", default="127.0.0.1", show_default=True)
 @click.option("-p", "--consul-port", help="consul agent port", default=8500, type=click.INT, show_default=True)
