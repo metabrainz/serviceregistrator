@@ -26,10 +26,6 @@ import requests
 log = logging.getLogger("serviceregistrator")
 
 
-class ConsulAPIError(Exception):
-    pass
-
-
 class ConsulClient:
     DEFAULT_TIMEOUT = 30
 
