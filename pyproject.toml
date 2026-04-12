@@ -1,6 +1,6 @@
 [project]
 name = "serviceregistrator"
-version = "0.6.0"
+version = "0.6.1"
 description = "Bridge betwen docker and consul services, inspired by registrator"
 authors = [{name = "Laurent Monin", email = "zas@metabrainz.org"}]
 license = {text = "GPL-3.0-or-later"}
