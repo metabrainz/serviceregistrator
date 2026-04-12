@@ -202,14 +202,12 @@ SERVICES=$(curl -sf http://127.0.0.1:$CONSUL_PORT/v1/agent/services)
 # Count how many services were registered for this container
 DUALIP_COUNT=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(1 for v in d.values() if 'dummyservice_dualip' in v.get('Service','')))")
 echo "  INFO: registered $DUALIP_COUNT service(s) for dual-IP container"
-check "Dual-IP: at least one service registered" sh -c "[ $DUALIP_COUNT -ge 1 ]"
 # Check what IPs were registered
 DUALIP_IPS=$(echo "$SERVICES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(' '.join(sorted(v['Address'] for v in d.values() if 'dummyservice_dualip' in v.get('Service',''))))")
 echo "  INFO: registered IPs: $DUALIP_IPS"
-# Currently only one IP gets registered (the second is dropped as duplicate name).
-# With multi-IP support, both should be registered:
-# check "Dual-IP: both IPs registered" sh -c "[ $DUALIP_COUNT -eq 2 ]"
-check_log "Dual-IP: second IP dropped as duplicate" "Service name already exists: dummyservice_dualip"
+check "Dual-IP: both IPs registered" sh -c "[ $DUALIP_COUNT -eq 2 ]"
+check "Dual-IP: 127.0.0.1 registered" sh -c "echo '$DUALIP_IPS' | grep -q '127.0.0.1'"
+check "Dual-IP: 127.0.0.2 registered" sh -c "echo '$DUALIP_IPS' | grep -q '127.0.0.2'"
 
 echo ""
 echo "=== Test: all-interfaces binding (0.0.0.0, uses --ip default) ==="

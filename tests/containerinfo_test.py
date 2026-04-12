@@ -81,14 +81,14 @@ class TestContainerInfo(unittest.TestCase):
         self.assertIsNone(value)
 
     def test_names_count(self):
-        counts = self.container_info.names_count()
+        counts = self.container_info.unique_ports_count()
         self.assertIn("dummyservice_80_name", counts)
         self.assertEqual(counts["dummyservice_80_name"], 1)
 
     def test_names_count_no_name(self):
         self.container_info.metadata = ContainerMetadata()
         self.container_info.ports = [Ports(internal=81, external=8086, protocol="tcp", ip="0.0.0.0")]
-        counts = self.container_info.names_count()
+        counts = self.container_info.unique_ports_count()
         self.assertNotIn("dummyservice_80_name", counts)
         self.assertEqual(counts, {})
 
@@ -103,7 +103,7 @@ class TestContainerInfo(unittest.TestCase):
             Ports(internal=80, external=8086, protocol="tcp", ip="0.0.0.0"),
             Ports(internal=81, external=8087, protocol="tcp", ip="0.0.0.0"),
         ]
-        counts = self.container_info.names_count()
+        counts = self.container_info.unique_ports_count()
         self.assertIn("dummyservice_80_name", counts)
         self.assertIn("dummyservice_81_name", counts)
         self.assertEqual(counts["dummyservice_80_name"], 1)
@@ -116,7 +116,7 @@ class TestContainerInfo(unittest.TestCase):
             Ports(internal=80, external=8086, protocol="tcp", ip="0.0.0.0"),
             Ports(internal=81, external=8087, protocol="tcp", ip="0.0.0.0"),
         ]
-        counts = self.container_info.names_count()
+        counts = self.container_info.unique_ports_count()
         self.assertIn("dummyservice_name", counts)
         self.assertEqual(counts["dummyservice_name"], 2)
 
@@ -189,7 +189,7 @@ class TestContainerInfo(unittest.TestCase):
 
     def test_build_service_id(self):
         port = Ports(internal=80, external=8086, protocol="tcp", ip="0.0.0.0")
-        service_id = self.container_info.build_service_id(port)
+        service_id = self.container_info.build_service_id(port, "127.6.6.6")
         self.assertEqual(
             service_id, self.container_info.SERVICE_ID_SEPARATOR.join(("my_host_name", "dummyservice", "8086"))
         )
@@ -197,7 +197,7 @@ class TestContainerInfo(unittest.TestCase):
     def test_build_service_id_prefix(self):
         self.container_info.service_prefix = "x"
         port = Ports(internal=80, external=8086, protocol="tcp", ip="0.0.0.0")
-        service_id = self.container_info.build_service_id(port)
+        service_id = self.container_info.build_service_id(port, "127.6.6.6")
         self.assertEqual(
             service_id,
             self.container_info.SERVICE_ID_SEPARATOR.join(
@@ -207,7 +207,7 @@ class TestContainerInfo(unittest.TestCase):
 
     def test_build_service_id_udp(self):
         port = Ports(internal=80, external=8086, protocol="udp", ip="0.0.0.0")
-        service_id = self.container_info.build_service_id(port)
+        service_id = self.container_info.build_service_id(port, "127.6.6.6")
         self.assertEqual(
             service_id, self.container_info.SERVICE_ID_SEPARATOR.join(("my_host_name", "dummyservice", "8086", "udp"))
         )
@@ -215,7 +215,7 @@ class TestContainerInfo(unittest.TestCase):
     def test_build_service_id_udp_prefix(self):
         self.container_info.service_prefix = "x"
         port = Ports(internal=80, external=8086, protocol="udp", ip="0.0.0.0")
-        service_id = self.container_info.build_service_id(port)
+        service_id = self.container_info.build_service_id(port, "127.6.6.6")
         self.assertEqual(
             service_id,
             self.container_info.SERVICE_ID_SEPARATOR.join(

@@ -20,6 +20,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import defaultdict
+import hashlib
 import ipaddress
 import logging
 from typing import Any
@@ -85,20 +86,24 @@ class ContainerInfo:
             return self.service_prefix + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
 
-    def names_count(self) -> dict[str | None, int]:
-        """Count services with same name or no name"""
-        names_count: dict[str | None, int] = defaultdict(lambda: 0)
+    def unique_ports_count(self) -> dict[str | None, int]:
+        """Count services with same name, ignoring IP differences.
+
+        Two ports that differ only by IP (same internal, external, protocol)
+        are counted once — they represent the same service on multiple IPs.
+        """
+        seen: dict[str | None, set[tuple[int, str]]] = defaultdict(set)
         for port in self.ports:
             name = self.get_name(port)
             if name:
-                names_count[name] += 1
-        return names_count
+                seen[name].add((port.external, port.protocol))
+        return {name: len(ports) for name, ports in seen.items()}
 
     def build_service_name(self, port: Any) -> str | None:
         if self._names_count is None:
-            self._names_count = self.names_count()
+            self._names_count = self.unique_ports_count()
         name = self.get_name(port)
-        count = self._names_count[name]
+        count = self._names_count.get(name, 0)
         if count < 1:
             return None
         elif count > 1:
@@ -118,13 +123,28 @@ class ContainerInfo:
     def build_service_attrs(self, port: Any) -> dict[str, str]:
         return self.get_attr("attrs", port.internal) or {}
 
-    def build_service_id(self, port: Any) -> str:
+    @staticmethod
+    def _ip_hash(ip: str) -> str:
+        """Return a short hash of an IP address for use in service IDs."""
+        return hashlib.sha256(ip.encode()).hexdigest()[:8]
+
+    def _has_multiple_ips(self, port: Any) -> bool:
+        """Check if this (external port, protocol) is bound to multiple IPs."""
+        count = sum(
+            1 for p in self.ports
+            if p.external == port.external and p.protocol == port.protocol and p.ip != port.ip
+        )
+        return count > 0
+
+    def build_service_id(self, port: Any, ip: str) -> str:
         parts: list[str] = []
         if self.service_prefix:
             parts.append(self.service_prefix)
         parts.extend([self.hostname, self.name, str(port.external)])
         if port.protocol != "tcp":
             parts.append(str(port.protocol))
+        if self._has_multiple_ips(port):
+            parts.append(self._ip_hash(ip))
         return self.SERVICE_ID_SEPARATOR.join(parts)
 
     @staticmethod
@@ -164,28 +184,30 @@ class ContainerInfo:
                 if service_name is None:
                     log.info(f"Skipping port {port}, no service name set")
                     continue
-                if service_name in services:
-                    log.warning(f"Service name already exists: {service_name} ({self})")
+                ip = self.build_service_ip(port)
+                service_id = self.build_service_id(port, ip)
+                if service_id in services:
+                    log.warning(f"Service ID already exists: {service_id} ({self})")
                     continue
                 service = Service(
                     self.cid,
-                    self.build_service_id(port),
+                    service_id,
                     service_name,
-                    self.build_service_ip(port),
+                    ip,
                     port.external,
                     tags=self.build_service_tags(port),
                     attrs=self.build_service_attrs(port),
                 )
-                services[service_name] = service
+                services[service_id] = service
 
                 # Create alias service if SERVICE_<port>_ALIAS is set
                 alias_name = self.build_service_alias(port)
                 if alias_name:
-                    alias_id = self.build_service_id(port) + self.SERVICE_ID_SEPARATOR + "alias"
-                    if alias_name in services:
-                        log.warning(f"Alias name already exists: {alias_name} ({self})")
+                    alias_id = service_id + self.SERVICE_ID_SEPARATOR + "alias"
+                    if alias_id in services:
+                        log.warning(f"Alias ID already exists: {alias_id} ({self})")
                     else:
-                        services[alias_name] = Service(
+                        services[alias_id] = Service(
                             self.cid,
                             alias_id,
                             alias_name,

@@ -100,8 +100,8 @@ class TestServicesDuplicateName(unittest.TestCase):
         assert "svc-8080" in names
         assert "svc-8081" in names
 
-    def test_duplicate_service_name_skipped(self):
-        """Force build_service_name to return same name for two ports — second is skipped."""
+    def test_duplicate_service_name_different_ids_allowed(self):
+        """Same service name on different ports with different IDs — both registered."""
 
         ci = ContainerInfo(
             "cid",
@@ -119,7 +119,10 @@ class TestServicesDuplicateName(unittest.TestCase):
         # Monkey-patch build_service_name to always return the same name
         ci.build_service_name = lambda port: "svc"
         services = ci.services
-        assert len(services) == 1
+        assert len(services) == 2
+        # Both have the same name but different IDs
+        assert services[0].name == services[1].name == "svc"
+        assert services[0].id != services[1].id
 
 
 class TestBuildServiceIpValidation(unittest.TestCase):
@@ -211,7 +214,7 @@ class TestBuildServiceAlias(unittest.TestCase):
         assert "db" in alias.tags
 
     def test_alias_name_collision_with_service_name(self):
-        """Alias name same as another service name — alias is skipped."""
+        """Alias name same as service name — both registered (different IDs)."""
         ci = ContainerInfo(
             "cid",
             "name",
@@ -223,6 +226,9 @@ class TestBuildServiceAlias(unittest.TestCase):
             [],
         )
         services = ci.services
-        assert len(services) == 1
-        assert services[0].name == "real-svc"
-        assert services[0].alias_of is None
+        assert len(services) == 2
+        real = [s for s in services if s.alias_of is None][0]
+        alias = [s for s in services if s.alias_of is not None][0]
+        assert real.name == "real-svc"
+        assert alias.name == "real-svc"
+        assert alias.id.endswith(":alias")
