@@ -11,7 +11,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "click>=7.1.2",
+    "click>=8.3.2",
     "docker>=4.4.1",
     "requests>=2.20.0",
     "urllib3>=1.26.0",
