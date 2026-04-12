@@ -135,3 +135,8 @@ class TestExtractPortsHost(unittest.TestCase):
         self.container.attrs["Config"]["ExposedPorts"] = {}
         ports = ServiceRegistrator.extract_ports(self.container)
         self.assertEqual(ports, [])
+
+    def test_extract_ports_no_exposed_ports_key(self):
+        del self.container.attrs["Config"]["ExposedPorts"]
+        ports = ServiceRegistrator.extract_ports(self.container)
+        self.assertEqual(ports, [])

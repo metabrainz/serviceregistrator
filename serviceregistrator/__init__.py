@@ -65,13 +65,12 @@ class ContainerMetadata(UserDict[str, Any]):
 
 
 class Context:
-    kill_now: bool = False
-    on_exit: dict[str, Any] = dict()
-    _sig2name: dict[int, str] | None = None
-    serviceregistrator: Any = None
-
     def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
+        self.kill_now: bool = False
+        self.on_exit: dict[str, Any] = {}
+        self._sig2name: dict[int, str] | None = None
+        self.serviceregistrator: Any = None
         self.configure_logging(options)
         self.containers: dict[str, Any] = {}
 

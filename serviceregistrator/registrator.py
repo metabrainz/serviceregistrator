@@ -206,7 +206,7 @@ class ServiceRegistrator:
         networkmode = container.attrs["HostConfig"]["NetworkMode"]
         if networkmode == "host":
             # Extract configured host port mappings, relevant when using --net=host
-            exposed_ports = container.attrs["Config"]["ExposedPorts"]
+            exposed_ports = container.attrs["Config"].get("ExposedPorts")
             if exposed_ports:
                 log.debug(f"Config ExposedPorts {container}: {exposed_ports!r}")
                 for exposed_port in exposed_ports:
