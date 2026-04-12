@@ -3,22 +3,18 @@
 An alternative to https://github.com/gliderlabs/registrator
 
 
-## Install poetry
+## Install uv
 
-https://python-poetry.org/docs/#installation
+https://docs.astral.sh/uv/getting-started/installation/
 
 ## Dev env
 
 ```bash
-poetry shell
+uv sync
 ```
 
 ```bash
-poetry install
-```
-
-```bash
-serviceregistrator --help
+uv run serviceregistrator --help
 ```
 
 ## Running in a docker container
