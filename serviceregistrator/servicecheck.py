@@ -22,18 +22,20 @@
 import json
 import logging
 import shlex
+from typing import Any
 
+from serviceregistrator.service import Service
 
 log = logging.getLogger("serviceregistrator")
 
 
-def _build_check(**kwargs):
+def _build_check(**kwargs: Any) -> dict[str, Any]:
     """Build a check dict, omitting None values."""
     return {k: v for k, v in kwargs.items() if v is not None}
 
 
 class ServiceCheck:
-    defaults = {
+    defaults: dict[str, Any] = {
         "body": None,
         "deregister": None,
         "docker": None,
@@ -52,20 +54,20 @@ class ServiceCheck:
         "ttl": None,
     }
 
-    consul_version = (0, 0, 0)
+    consul_version: tuple[int, ...] = (0, 0, 0)
 
     @classmethod
-    def _value(cls, params, key):
+    def _value(cls, params: dict[str, str], key: str) -> Any:
         return params.get(key, cls.defaults.get(key))
 
     @classmethod
-    def _common_values(cls, params):
+    def _common_values(cls, params: dict[str, str]) -> tuple[Any, Any]:
         interval = cls._value(params, "interval")
         deregister = cls._value(params, "deregister")
         return interval, deregister
 
     @classmethod
-    def _json_value(cls, params, key):
+    def _json_value(cls, params: dict[str, str], key: str) -> Any:
         value = cls._value(params, key)
         if value:
             try:
@@ -75,12 +77,12 @@ class ServiceCheck:
         return None
 
     @classmethod
-    def _bool_value(cls, params, key):
+    def _bool_value(cls, params: dict[str, str], key: str) -> bool:
         value = cls._value(params, key)
-        return value and value.lower() == "true"
+        return bool(value and value.lower() == "true")
 
     @classmethod
-    def _post_process(cls, checkret, params):
+    def _post_process(cls, checkret: dict[str, Any], params: dict[str, str]) -> dict[str, Any]:
         # https://developer.hashicorp.com/consul/api-docs/agent/check#status
         initial_status = cls._value(params, "initial_status")
         if initial_status:
@@ -88,7 +90,7 @@ class ServiceCheck:
         return checkret
 
     @classmethod
-    def _http(cls, service, params, proto="http"):
+    def _http(cls, service: Service, params: dict[str, str], proto: str = "http") -> dict[str, Any] | None:
         """
         Consul HTTP/HTTPS Check
 
@@ -126,15 +128,15 @@ class ServiceCheck:
         return None
 
     @classmethod
-    def http(cls, service, params):
+    def http(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         return cls._http(service, params, proto="http")
 
     @classmethod
-    def https(cls, service, params):
+    def https(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         return cls._http(service, params, proto="https")
 
     @classmethod
-    def tcp(cls, service, params):
+    def tcp(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         """
         Consul TCP Check
 
@@ -159,7 +161,7 @@ class ServiceCheck:
         return None
 
     @classmethod
-    def ttl(cls, service, params):
+    def ttl(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         """
         Consul TTL Check
 
@@ -173,7 +175,7 @@ class ServiceCheck:
         return None
 
     @classmethod
-    def script(cls, service, params):
+    def script(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         """
         Consul Script Check
 
@@ -190,7 +192,7 @@ class ServiceCheck:
         return None
 
     @classmethod
-    def docker(cls, service, params):
+    def docker(cls, service: Service, params: dict[str, str]) -> dict[str, Any] | None:
         """
         Consul Docker Check
 

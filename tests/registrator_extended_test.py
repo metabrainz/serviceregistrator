@@ -66,12 +66,12 @@ class TestParseTagsString(unittest.TestCase):
     def test_valid_tags(self):
         container = Mock()
         result = ServiceRegistrator.parse_tags_string(container, "tag1,tag2,tag3")
-        assert result == "tag1,tag2,tag3"
+        assert result == ["tag1", "tag2", "tag3"]
 
     def test_empty_string(self):
         container = Mock()
         result = ServiceRegistrator.parse_tags_string(container, "")
-        assert result == ""
+        assert result == []
 
     def test_invalid_tag(self):
         container = Mock()
@@ -89,8 +89,7 @@ class TestParseTagsString(unittest.TestCase):
     def test_dedup(self):
         container = Mock()
         result = ServiceRegistrator.parse_tags_string(container, "a,a,b")
-        tags = result.split(",")
-        assert len(tags) == 2
+        assert len(result) == 2
 
 
 class TestMakeCheck(unittest.TestCase):

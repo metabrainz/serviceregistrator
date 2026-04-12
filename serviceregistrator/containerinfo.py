@@ -22,6 +22,7 @@
 from collections import defaultdict
 import ipaddress
 import logging
+from typing import Any
 
 from serviceregistrator.service import Service
 
@@ -33,7 +34,17 @@ class ContainerInfo:
     SERVICE_PREFIX_NAME_SEPARATOR = "-"
     SERVICE_ID_SEPARATOR = ":"
 
-    def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
+    def __init__(
+        self,
+        cid: str,
+        name: str,
+        ports: list[Any],
+        metadata: Any,
+        metadata_with_port: dict[int, Any],
+        hostname: str,
+        serviceip: str,
+        tags: list[str],
+    ) -> None:
         self.cid = cid
         self.name = name
         self.ports = ports
@@ -41,26 +52,26 @@ class ContainerInfo:
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
         self.serviceip = serviceip
-        self.service_prefix = None
+        self.service_prefix: str | None = None
         self.tags = [x for x in set(tags) if x]
-        self.health = None
+        self.health: str | None = None
 
-        self._services = None
-        self._names_count = None
+        self._services: list[Service] | None = None
+        self._names_count: dict[str | None, int] | None = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<{self.__class__.__name__}: {self.name} ({self.cid[:10]})>"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             "{t}('{s.cid}', '{s.name}', {s.ports}, {s.metadata}, {s.metadata_with_port}, "
             "'{s.hostname}', '{s.serviceip}', {s.tags})"
         ).format(t=type(self).__name__, s=self)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return bool(self.metadata or self.metadata_with_port)
 
-    def get_attr(self, key, port):
+    def get_attr(self, key: str, port: int) -> Any:
         if port in self.metadata_with_port and key in self.metadata_with_port[port]:
             return self.metadata_with_port[port][key]
         elif key in self.metadata:
@@ -68,22 +79,22 @@ class ContainerInfo:
         else:
             return None
 
-    def get_name(self, port):
+    def get_name(self, port: Any) -> str | None:
         name = self.get_attr("name", port.internal)
         if name and self.service_prefix:
             return self.service_prefix + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
 
-    def names_count(self):
+    def names_count(self) -> dict[str | None, int]:
         """Count services with same name or no name"""
-        names_count = defaultdict(lambda: 0)
+        names_count: dict[str | None, int] = defaultdict(lambda: 0)
         for port in self.ports:
             name = self.get_name(port)
             if name:
                 names_count[name] += 1
         return names_count
 
-    def build_service_name(self, port):
+    def build_service_name(self, port: Any) -> str | None:
         if self._names_count is None:
             self._names_count = self.names_count()
         name = self.get_name(port)
@@ -96,7 +107,7 @@ class ContainerInfo:
                 name = f"{name}-{port.protocol}"
         return name
 
-    def build_service_tags(self, port):
+    def build_service_tags(self, port: Any) -> list[str]:
         tags = self.get_attr("tags", port.internal) or []
         if self.tags:
             tags.extend(self.tags)
@@ -104,11 +115,11 @@ class ContainerInfo:
             tags.append(port.protocol)
         return [x for x in set(tags) if x]
 
-    def build_service_attrs(self, port):
+    def build_service_attrs(self, port: Any) -> dict[str, str]:
         return self.get_attr("attrs", port.internal) or {}
 
-    def build_service_id(self, port):
-        parts = []
+    def build_service_id(self, port: Any) -> str:
+        parts: list[str] = []
         if self.service_prefix:
             parts.append(self.service_prefix)
         parts.extend([self.hostname, self.name, str(port.external)])
@@ -117,7 +128,7 @@ class ContainerInfo:
         return self.SERVICE_ID_SEPARATOR.join(parts)
 
     @staticmethod
-    def _validate_ip(ip):
+    def _validate_ip(ip: str) -> bool:
         """Validate IP address to prevent injection via SERVICE_IP."""
         try:
             ipaddress.ip_address(ip)
@@ -125,7 +136,7 @@ class ContainerInfo:
         except ValueError:
             return False
 
-    def build_service_ip(self, port):
+    def build_service_ip(self, port: Any) -> str:
         ip = self.get_attr("ip", port.internal)
         if ip is None:
             if port.ip not in {"0.0.0.0", "::", ""}:
@@ -139,18 +150,17 @@ class ContainerInfo:
             return self.serviceip
 
     @property
-    def services(self):
+    def services(self) -> list[Service]:
         if self._services is None:
             self._names_count = None
 
-            services = dict()
+            services: dict[str, Service] = dict()
             for port in self.ports:
                 service_name = self.build_service_name(port)
                 if service_name is None:
                     log.info(f"Skipping port {port}, no service name set")
                     continue
                 if service_name in services:
-                    # this shouldn't happen, but emit a warning and skip if it does
                     log.warning(f"Service name already exists: {service_name} ({self})")
                     continue
                 services[service_name] = Service(
@@ -165,5 +175,5 @@ class ContainerInfo:
             self._services = list(services.values())
         return self._services
 
-    def service_identifiers(self):
+    def service_identifiers(self) -> list[str]:
         return [service.id for service in self.services]

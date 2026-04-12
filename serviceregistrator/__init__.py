@@ -30,7 +30,7 @@ log = logging.getLogger("serviceregistrator")
 
 
 class ContainerMetadata(UserDict[str, Any]):
-    def __setitem__(self, key: str, value: Any) -> None:  # type: ignore[override]
+    def __setitem__(self, key: str, value: Any) -> None:  # ty: ignore[invalid-method-override]
         # all keys are lowered
         key = key.lower()
         if key in ("tags",):
@@ -60,20 +60,20 @@ class ContainerMetadata(UserDict[str, Any]):
                 super().__setitem__("attrs", dict())
             self["attrs"][key] = value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}({self.data})"
 
 
 class Context:
-    kill_now = False
-    on_exit = dict()
-    _sig2name = None
-    serviceregistrator = None
+    kill_now: bool = False
+    on_exit: dict[str, Any] = dict()
+    _sig2name: dict[int, str] | None = None
+    serviceregistrator: Any = None
 
-    def __init__(self, options):
+    def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
         self.configure_logging(options)
-        self.containers = {}
+        self.containers: dict[str, Any] = {}
 
         # exit signals
         signal.signal(signal.SIGINT, self.exit_gracefully)
@@ -90,29 +90,27 @@ class Context:
             log.info(f"Resync every {resync} seconds")
             signal.setitimer(signal.ITIMER_REAL, resync, resync)
 
-    def _log_signal(self, signum):
+    def _log_signal(self, signum: int) -> None:
         if self._sig2name is None:
-            # extract signal names from signal module
-            # signal.Signals is an enum
             self._sig2name = dict([(s.value, s.name) for s in signal.Signals])
 
         name = self._sig2name.get(signum, signum)
         log.info(f"Received {name} signal")
 
-    def ignore_signal(self, signum, frame):
+    def ignore_signal(self, signum: int, frame: Any) -> None:
         self._log_signal(signum)
 
-    def exit_gracefully(self, signum, frame):
+    def exit_gracefully(self, signum: int, frame: Any) -> None:
         self._log_signal(signum)
         self.kill_now = True
         for func in self.on_exit.values():
             func()
         log.info("Exiting gracefully...")
 
-    def register_on_exit(self, name, func):
+    def register_on_exit(self, name: str, func: Any) -> None:
         self.on_exit[name] = func
 
-    def sync_with_containers(self, signum, frame):
+    def sync_with_containers(self, signum: int, frame: Any) -> None:
         self._log_signal(signum)
         if self.serviceregistrator:
             self.serviceregistrator.sync_with_containers()

@@ -19,6 +19,7 @@
 """Minimal Consul HTTP API client, replacing python-consul2."""
 
 import logging
+from typing import Any
 
 import requests
 
@@ -30,26 +31,35 @@ class ConsulAPIError(Exception):
 
 
 class ConsulClient:
-    def __init__(self, host="127.0.0.1", port=8500):
+    def __init__(self, host: str = "127.0.0.1", port: int = 8500) -> None:
         self.base_url = f"http://{host}:{port}/v1"
 
-    def _request(self, method, path, **kwargs):
+    def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         url = f"{self.base_url}{path}"
         resp = requests.request(method, url, **kwargs)
         resp.raise_for_status()
         return resp
 
-    def status_peers(self):
+    def status_peers(self) -> list[str]:
         return self._request("GET", "/status/peers").json()
 
-    def agent_self(self):
+    def agent_self(self) -> dict[str, Any]:
         return self._request("GET", "/agent/self").json()
 
-    def agent_services(self):
+    def agent_services(self) -> dict[str, Any]:
         return self._request("GET", "/agent/services").json()
 
-    def agent_service_register(self, name, service_id, address, port, tags=None, meta=None, check=None):
-        payload = {
+    def agent_service_register(
+        self,
+        name: str,
+        service_id: str,
+        address: str,
+        port: int,
+        tags: list[str] | None = None,
+        meta: dict[str, str] | None = None,
+        check: dict[str, Any] | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
             "Name": name,
             "ID": service_id,
             "Address": address,
@@ -63,5 +73,5 @@ class ConsulClient:
             payload["Check"] = check
         self._request("PUT", "/agent/service/register", json=payload)
 
-    def agent_service_deregister(self, service_id):
+    def agent_service_deregister(self, service_id: str) -> None:
         self._request("PUT", f"/agent/service/deregister/{service_id}")
