@@ -444,7 +444,7 @@ class ServiceRegistrator:
             meta[k] = v
         return meta
 
-    def consul_register_service(self, service: Service) -> None:
+    def consul_register_service(self, service: Service) -> bool:
         log.info(f"REGISTER SERVICE {service}")
         log.debug(repr(service))
         try:
@@ -457,10 +457,10 @@ class ServiceRegistrator:
                 meta=self.service_meta(service),
                 check=self.make_check(service),
             )
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
+            return True
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to register service {service.id}: {e}")
+            return False
 
     def consul_unregister_service(self, service: Service | str) -> None:
         if isinstance(service, Service):
@@ -472,14 +472,16 @@ class ServiceRegistrator:
             log.info(f"UNREGISTER SERVICE with id {service_id}")
         try:
             self.consul_client.agent_service_deregister(service_id)
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to deregister service {service_id}: {e}")
 
-    def register_services(self, container_info: ContainerInfo) -> None:
+    def register_services(self, container_info: ContainerInfo) -> bool:
+        """Register all services for a container. Returns True if all succeeded."""
+        all_ok = True
         for service in container_info.services:
-            self.consul_register_service(service)
+            if not self.consul_register_service(service):
+                all_ok = False
+        return all_ok
 
     def unregister_services(self, container_info: ContainerInfo) -> None:
         for service in container_info.services:
@@ -491,8 +493,10 @@ class ServiceRegistrator:
             return
         log.info(f"REGISTER CONTAINER {container_info}")
         log.debug(repr(container_info))
-        self.containers[container_info.cid] = container_info
-        self.register_services(container_info)
+        if self.register_services(container_info):
+            self.containers[container_info.cid] = container_info
+        else:
+            log.warning(f"Some services failed to register for {container_info}, will retry on next sync")
 
     def unregister_container(self, container_info: ContainerInfo) -> None:
         if container_info.cid in self.containers:

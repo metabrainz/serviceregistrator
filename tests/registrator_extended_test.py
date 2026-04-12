@@ -338,24 +338,37 @@ class TestConsulRegisterService(unittest.TestCase):
     def test_register_success(self):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
-        sr.consul_register_service(service)
+        result = sr.consul_register_service(service)
         sr.consul_client.agent_service_register.assert_called_once()
+        assert result is True
 
-    def test_register_connection_error(self):
+    def test_register_connection_error_returns_false(self):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
         from requests.exceptions import ConnectionError
 
         sr.consul_client.agent_service_register.side_effect = ConnectionError("fail")
-        with self.assertRaises(ConsulConnectionError):
-            sr.consul_register_service(service)
+        result = sr.consul_register_service(service)
+        assert result is False
 
-    def test_register_other_exception(self):
+    def test_register_other_exception_returns_false(self):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
         sr.consul_client.agent_service_register.side_effect = Exception("fail")
-        # Should not raise, just log
-        sr.consul_register_service(service)
+        result = sr.consul_register_service(service)
+        assert result is False
+
+    def test_register_failure_skips_container_tracking(self):
+        sr = make_registrator()
+        ci = Mock()
+        ci.cid = "cid1"
+        ci.health = None
+        svc = Service("cid1", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
+        ci.services = [svc]
+        sr.consul_client.agent_service_register.side_effect = Exception("500 scripts disabled")
+        sr.register_container(ci)
+        # Container should NOT be tracked so next sync retries
+        assert ci.cid not in sr.containers
 
 
 class TestConsulUnregisterService(unittest.TestCase):
@@ -375,12 +388,13 @@ class TestConsulUnregisterService(unittest.TestCase):
         from requests.exceptions import ConnectionError
 
         sr.consul_client.agent_service_deregister.side_effect = ConnectionError("fail")
-        with self.assertRaises(ConsulConnectionError):
-            sr.consul_unregister_service("sid")
+        # Should not raise, just log
+        sr.consul_unregister_service("sid")
 
     def test_unregister_other_exception(self):
         sr = make_registrator()
         sr.consul_client.agent_service_deregister.side_effect = Exception("fail")
+        # Should not raise, just log
         sr.consul_unregister_service("sid")
 
 
