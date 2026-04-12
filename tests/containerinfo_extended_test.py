@@ -154,3 +154,58 @@ class TestBuildServiceIpValidation(unittest.TestCase):
         ci = self._make_ci("not-an-ip; rm -rf /")
         ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
         assert ip == "127.0.0.1"
+
+
+class TestBuildServiceAlias(unittest.TestCase):
+    def test_alias_creates_extra_service(self):
+        ci = ContainerInfo(
+            "cid",
+            "name",
+            [Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0")],
+            ContainerMetadata(),
+            {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc"})},
+            "host",
+            "127.0.0.1",
+            [],
+        )
+        services = ci.services
+        assert len(services) == 2
+        names = {s.name for s in services}
+        assert "real-svc" in names
+        assert "alias-svc" in names
+
+        alias = [s for s in services if s.name == "alias-svc"][0]
+        assert alias.alias_of == "real-svc"
+        assert alias.port == 8080
+        assert alias.ip == "127.0.0.1"
+        assert alias.id.endswith(":alias")
+
+    def test_no_alias_no_extra_service(self):
+        ci = ContainerInfo(
+            "cid",
+            "name",
+            [Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0")],
+            ContainerMetadata(),
+            {80: ContainerMetadata({"name": "real-svc"})},
+            "host",
+            "127.0.0.1",
+            [],
+        )
+        services = ci.services
+        assert len(services) == 1
+        assert services[0].alias_of is None
+
+    def test_alias_inherits_tags(self):
+        ci = ContainerInfo(
+            "cid",
+            "name",
+            [Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0")],
+            ContainerMetadata(),
+            {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc", "tags": "prod,db"})},
+            "host",
+            "127.0.0.1",
+            [],
+        )
+        alias = [s for s in ci.services if s.name == "alias-svc"][0]
+        assert "prod" in alias.tags
+        assert "db" in alias.tags

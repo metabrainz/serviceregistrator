@@ -96,6 +96,7 @@ class TestMakeCheck(unittest.TestCase):
     def test_no_check_attrs(self):
         service = Mock()
         service.attrs = {"region": "us-east"}
+        service.alias_of = None
         result = ServiceRegistrator.make_check(service)
         assert result is None
 
@@ -114,10 +115,16 @@ class TestMakeCheck(unittest.TestCase):
         service = Mock()
         service.attrs = {"check_http": "/health"}
         service.id = "sid"
+        service.alias_of = None
         # Force an exception in the check function
         with patch("serviceregistrator.servicecheck.ServiceCheck.http", side_effect=Exception("boom")):
             result = ServiceRegistrator.make_check(service)
         assert result is None
+
+    def test_alias_check(self):
+        service = Service("cid", "sid", "alias-svc", "1.2.3.4", 80, alias_of="real-svc")
+        result = ServiceRegistrator.make_check(service)
+        assert result == {"AliasService": "real-svc"}
 
 
 class TestServiceMeta(unittest.TestCase):
@@ -132,6 +139,12 @@ class TestServiceMeta(unittest.TestCase):
         }
         result = ServiceRegistrator.service_meta(service)
         assert result == {"region": "us-east", "version": "1.0"}
+
+    def test_filters_alias(self):
+        service = Mock()
+        service.attrs = {"alias": "old-name", "region": "us-east"}
+        result = ServiceRegistrator.service_meta(service)
+        assert result == {"region": "us-east"}
 
 
 class TestWatchEvents(unittest.TestCase):

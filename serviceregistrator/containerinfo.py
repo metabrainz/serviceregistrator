@@ -149,6 +149,10 @@ class ContainerInfo:
             log.warning(f"Invalid SERVICE_IP '{ip}' for {self}, using default")
             return self.serviceip
 
+    def build_service_alias(self, port: Any) -> str | None:
+        attrs = self.build_service_attrs(port)
+        return attrs.get("alias")
+
     @property
     def services(self) -> list[Service]:
         if self._services is None:
@@ -163,7 +167,7 @@ class ContainerInfo:
                 if service_name in services:
                     log.warning(f"Service name already exists: {service_name} ({self})")
                     continue
-                services[service_name] = Service(
+                service = Service(
                     self.cid,
                     self.build_service_id(port),
                     service_name,
@@ -172,6 +176,25 @@ class ContainerInfo:
                     tags=self.build_service_tags(port),
                     attrs=self.build_service_attrs(port),
                 )
+                services[service_name] = service
+
+                # Create alias service if SERVICE_<port>_ALIAS is set
+                alias_name = self.build_service_alias(port)
+                if alias_name:
+                    alias_id = self.build_service_id(port) + self.SERVICE_ID_SEPARATOR + "alias"
+                    if alias_name in services:
+                        log.warning(f"Alias name already exists: {alias_name} ({self})")
+                    else:
+                        services[alias_name] = Service(
+                            self.cid,
+                            alias_id,
+                            alias_name,
+                            service.ip,
+                            service.port,
+                            tags=service.tags,
+                            attrs={},
+                            alias_of=service_name,
+                        )
             self._services = list(services.values())
         return self._services
 

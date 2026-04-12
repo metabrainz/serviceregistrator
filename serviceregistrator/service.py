@@ -30,6 +30,7 @@ class Service:
         port: int,
         tags: list[str] | None = None,
         attrs: dict[str, str] | None = None,
+        alias_of: str | None = None,
     ) -> None:
         self.id = id_
         self.name = name
@@ -38,6 +39,7 @@ class Service:
         self.tags = tags if tags is not None else []
         self.attrs = attrs if attrs is not None else dict()
         self.container_id = container_id
+        self.alias_of = alias_of
 
     def __str__(self) -> str:
         return (

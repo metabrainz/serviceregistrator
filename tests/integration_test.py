@@ -300,6 +300,62 @@ class TestServiceRegistratorIntegration:
         mp_services = {k: v for k, v in services.items() if "inttest-multi-port" in k}
         assert len(mp_services) == 0
 
+    def test_sync_alias_service(self, consul, docker_client, cleanup_containers):
+        hostname = socket.gethostname()
+        prefix = "inttest-alias"
+
+        container = docker_client.containers.run(
+            NGINX_IMAGE,
+            detach=True,
+            ports={"80/tcp": None},
+            environment=[
+                "SERVICE_80_NAME=haproxy-postgres-primary",
+                "SERVICE_80_ALIAS=postgres-master",
+                "SERVICE_TAGS=db",
+            ],
+            name="inttest-alias-svc",
+        )
+        cleanup_containers(container)
+        container.reload()
+
+        host_port = int(container.ports["80/tcp"][0]["HostPort"])
+
+        sr = _make_sr(prefix)
+        sr.sync_with_containers()
+
+        services = _services_with_prefix(consul, prefix)
+        alias_svcs = {k: v for k, v in services.items() if "inttest-alias-svc" in k}
+        assert len(alias_svcs) == 2, f"Expected 2 services (real + alias), got {list(alias_svcs.keys())}"
+
+        # Check the real service
+        real_id = f"{prefix}:{hostname}:inttest-alias-svc:{host_port}"
+        assert real_id in alias_svcs
+        assert alias_svcs[real_id]["Service"] == f"{prefix}-haproxy-postgres-primary"
+
+        # Check the alias service
+        alias_id = f"{prefix}:{hostname}:inttest-alias-svc:{host_port}:alias"
+        assert alias_id in alias_svcs
+        assert alias_svcs[alias_id]["Service"] == "postgres-master"
+        assert alias_svcs[alias_id]["Port"] == host_port
+
+        # Verify alias has an alias-type check pointing to the real service
+        checks_resp = requests.get(f"http://127.0.0.1:{CONSUL_PORT}/v1/agent/checks")
+        checks = checks_resp.json()
+        alias_checks = {k: v for k, v in checks.items() if v.get("ServiceID") == alias_id}
+        assert len(alias_checks) == 1
+        check = list(alias_checks.values())[0]
+        assert check["Type"] == "alias"
+
+        # Cleanup
+        container.stop(timeout=1)
+        container.remove(force=True)
+        sr.containers.clear()
+        sr.sync_with_containers()
+
+        services = _services_with_prefix(consul, prefix)
+        alias_svcs = {k: v for k, v in services.items() if "inttest-alias-svc" in k}
+        assert len(alias_svcs) == 0
+
 
 class TestMainLoopIntegration:
     """Test the CLI main() entry point end-to-end."""

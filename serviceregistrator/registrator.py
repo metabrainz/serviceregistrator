@@ -306,9 +306,9 @@ class ServiceRegistrator:
         metadata_with_port = dict()
 
         def validate_kv(key, value):
-            if key == "NAME":
+            if key in ("NAME", "ALIAS"):
                 if not SERVICE_NAME_REGEX.match(value):
-                    log.warning(f"{container}: Invalid service name: '{value}', ignoring")
+                    log.warning(f"{container}: Invalid service {key.lower()}: '{value}', ignoring")
                     return None
                 else:
                     return value
@@ -400,6 +400,10 @@ class ServiceRegistrator:
 
     @staticmethod
     def make_check(service: Service) -> dict[str, Any] | None:
+        # Alias services get an alias health check
+        if service.alias_of:
+            return {"AliasService": service.alias_of}
+
         checks = {
             "docker": ServiceCheck.docker,
             "http": ServiceCheck.http,
@@ -435,8 +439,7 @@ class ServiceRegistrator:
             if k.startswith("check_"):
                 # ignore SERVICE_CHECK_*
                 continue
-            if k == "ip":
-                # ignore SERVICE_IP
+            if k in ("ip", "alias"):
                 continue
             meta[k] = v
         return meta
@@ -516,12 +519,12 @@ class ServiceRegistrator:
                 length -= 1
         if length < 3:
             return False, "length < 3"
+        # Strip known suffixes: :udp, :alias
+        while length > 3 and identifier[-1] in ("udp", "alias"):
+            identifier = identifier[:-1]
+            length -= 1
         if length > 3:
-            if identifier[-1] != "udp":
-                return False, "no udp"
-            else:
-                identifier = identifier[:-1]
-                length -= 1
+            return False, "unexpected suffix"
         if identifier[0] != self.hostname:
             return False, "different hostname"
         return True, None

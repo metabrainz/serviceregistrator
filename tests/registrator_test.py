@@ -57,9 +57,16 @@ class TestIsOurIdentifier(unittest.TestCase):
     def test_4elems_same_hostname_same_prefix_no_udp(self):
         yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z:hhh", prefix="abc")
         self.assertFalse(yes)
-        self.assertEqual(comment, "no udp")
+        self.assertEqual(comment, "unexpected suffix")
 
     def test_4elems_same_hostname_same_prefix_udp(self):
         yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z:udp", prefix="abc")
+        self.assertTrue(yes)
+        self.assertIsNone(comment)
+
+    def test_4elems_same_hostname_same_prefix_alias(self):
+        yes, comment = self.registrator.is_our_identifier(
+            "abc:" + self.registrator.hostname + ":y:z:alias", prefix="abc"
+        )
         self.assertTrue(yes)
         self.assertIsNone(comment)
