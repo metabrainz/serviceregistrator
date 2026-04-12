@@ -457,8 +457,8 @@ requires-dist = [
     { name = "click", specifier = ">=7.1.2" },
     { name = "docker", specifier = ">=4.4.1" },
     { name = "python-consul2", specifier = ">=0.1.5" },
-    { name = "requests", specifier = "<2.29.0" },
-    { name = "urllib3", specifier = "<2.0" },
+    { name = "requests", specifier = ">=2.20.0" },
+    { name = "urllib3", specifier = ">=1.26.0" },
 ]
 
 [package.metadata.requires-dev]
