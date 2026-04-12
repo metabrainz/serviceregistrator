@@ -20,13 +20,18 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import UserDict
-from typing import Any
+from typing import Any, NamedTuple
 import logging
 import signal
 import sys
 
 
 log = logging.getLogger("serviceregistrator")
+
+
+class ServiceIP(NamedTuple):
+    ip: str
+    tag: str | None = None
 
 
 class ContainerMetadata(UserDict[str, Any]):

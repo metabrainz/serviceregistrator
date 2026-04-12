@@ -1,5 +1,5 @@
 import unittest
-from serviceregistrator import ContainerMetadata
+from serviceregistrator import ContainerMetadata, ServiceIP
 from serviceregistrator.containerinfo import ContainerInfo
 from serviceregistrator.registrator import Ports
 
@@ -13,7 +13,7 @@ class TestContainerInfoStringRepresentations(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "myhost",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
 
@@ -40,7 +40,7 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         ip = ci.build_service_ip(ci.ports[0])
@@ -55,7 +55,7 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         ip = ci.build_service_ip(ci.ports[0])
@@ -70,7 +70,7 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         ip = ci.build_service_ip(ci.ports[0])
@@ -90,7 +90,7 @@ class TestServicesDuplicateName(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "svc"})},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -112,7 +112,7 @@ class TestServicesDuplicateName(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         # Monkey-patch build_service_name to always return the same name
@@ -133,7 +133,7 @@ class TestBuildServiceIpValidation(unittest.TestCase):
             ContainerMetadata({"name": "svc", "ip": service_ip_override}),
             {},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
 
@@ -167,7 +167,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc"})},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -190,7 +190,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc"})},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -205,7 +205,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc", "tags": "prod,db"})},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         alias = [s for s in ci.services if s.name == "alias-svc"][0]
@@ -221,7 +221,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "real-svc"})},
             "host",
-            [("127.0.0.1", None)],
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services

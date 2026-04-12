@@ -1,5 +1,5 @@
 import unittest
-from serviceregistrator import ContainerMetadata
+from serviceregistrator import ContainerMetadata, ServiceIP
 from serviceregistrator.containerinfo import ContainerInfo
 from serviceregistrator.registrator import Ports
 
@@ -12,7 +12,7 @@ class TestContainerInfo(unittest.TestCase):
         container_id = "deadbeef"
         service_name = "dummyservice"
         hostname = "my_host_name"
-        ip = [("127.6.6.6", None)]
+        ip = [ServiceIP("127.6.6.6")]
         tags = ["tag1", "tag2"]
         self.container_info = ContainerInfo(
             container_id, service_name, ports, metadata, metadata_with_port, hostname, ip, tags

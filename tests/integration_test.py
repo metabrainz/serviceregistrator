@@ -13,6 +13,7 @@ import docker
 import pytest
 import requests
 
+from serviceregistrator import ServiceIP
 from serviceregistrator.consul_client import ConsulClient
 
 CONSUL_IMAGE = "hashicorp/consul:1.15"
@@ -99,7 +100,7 @@ def _make_sr(prefix, ip_tags=None):
     from serviceregistrator.registrator import ServiceRegistrator
 
     options = {
-        "ip": ip_tags or [("127.0.0.1", None)],
+        "ip": ip_tags or [ServiceIP("127.0.0.1")],
         "tags": "",
         "consul_host": "127.0.0.1",
         "consul_port": CONSUL_PORT,
@@ -377,7 +378,7 @@ class TestServiceRegistratorIntegration:
 
         host_port = int(container.ports["80/tcp"][0]["HostPort"])
 
-        sr = _make_sr(prefix, ip_tags=[("127.0.0.1", "physical"), ("127.0.0.2", "virtual")])
+        sr = _make_sr(prefix, ip_tags=[ServiceIP("127.0.0.1", "physical"), ServiceIP("127.0.0.2", "virtual")])
         sr.sync_with_containers()
 
         services = _services_with_prefix(consul, prefix)

@@ -25,6 +25,7 @@ import ipaddress
 import logging
 from typing import Any
 
+from serviceregistrator import ServiceIP
 from serviceregistrator.service import Service
 
 
@@ -43,7 +44,7 @@ class ContainerInfo:
         metadata: Any,
         metadata_with_port: dict[int, Any],
         hostname: str,
-        service_ips: list[tuple[str, str | None]],
+        service_ips: list[ServiceIP],
         tags: list[str],
     ) -> None:
         self.cid = cid
@@ -52,7 +53,7 @@ class ContainerInfo:
         self.metadata_with_port = metadata_with_port
         self.hostname = hostname
         self.service_ips = service_ips
-        self.ip_tag_map: dict[str, str] = {ip: tag for ip, tag in service_ips if tag}
+        self.ip_tag_map: dict[str, str] = {sip.ip: sip.tag for sip in service_ips if sip.tag}
         self.service_prefix: str | None = None
         self.tags = [x for x in set(tags) if x]
         self.health: str | None = None
@@ -61,8 +62,8 @@ class ContainerInfo:
         self.ports: list[Any] = []
         for port in ports:
             if port.ip in {"0.0.0.0", "::", ""}:
-                for ip, _tag in service_ips:
-                    self.ports.append(port._replace(ip=ip))
+                for sip in service_ips:
+                    self.ports.append(port._replace(ip=sip.ip))
             else:
                 self.ports.append(port)
 

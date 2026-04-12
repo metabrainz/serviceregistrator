@@ -28,6 +28,7 @@ import traceback
 from time import sleep
 
 from serviceregistrator import Context
+from serviceregistrator import ServiceIP
 from serviceregistrator.registrator import ServiceRegistrator, ConsulConnectionError
 
 
@@ -61,7 +62,7 @@ def parse_ip_tags(ctx, param, value):
             ipaddress.ip_address(ip)
         except ValueError:
             raise click.BadParameter(f"invalid IP address: {ip}")
-        result.append((ip, tag))
+        result.append(ServiceIP(ip, tag))
     if not result:
         raise click.BadParameter("at least one --ip is required")
     return result
