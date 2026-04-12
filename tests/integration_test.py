@@ -93,13 +93,13 @@ def cleanup_containers(docker_client):
             pass
 
 
-def _make_sr(prefix):
+def _make_sr(prefix, ip_tags=None):
     """Create a ServiceRegistrator with a unique prefix to isolate from host containers."""
     from serviceregistrator import Context
     from serviceregistrator.registrator import ServiceRegistrator
 
     options = {
-        "ip": [("127.0.0.1", None)],
+        "ip": ip_tags or [("127.0.0.1", None)],
         "tags": "",
         "consul_host": "127.0.0.1",
         "consul_port": CONSUL_PORT,
@@ -355,6 +355,62 @@ class TestServiceRegistratorIntegration:
         services = _services_with_prefix(consul, prefix)
         alias_svcs = {k: v for k, v in services.items() if "inttest-alias-svc" in k}
         assert len(alias_svcs) == 0
+
+
+    def test_sync_multi_ip_with_tags(self, consul, docker_client, cleanup_containers):
+        hostname = socket.gethostname()
+        prefix = "inttest-mip"
+
+        container = docker_client.containers.run(
+            NGINX_IMAGE,
+            detach=True,
+            ports={"80/tcp": None},
+            environment=[
+                "SERVICE_80_NAME=inttest-multiip",
+                "SERVICE_80_CHECK_TCP=true",
+                "SERVICE_80_CHECK_INTERVAL=10s",
+            ],
+            name="inttest-multiip-svc",
+        )
+        cleanup_containers(container)
+        container.reload()
+
+        host_port = int(container.ports["80/tcp"][0]["HostPort"])
+
+        sr = _make_sr(prefix, ip_tags=[("127.0.0.1", "physical"), ("127.0.0.2", "virtual")])
+        sr.sync_with_containers()
+
+        services = _services_with_prefix(consul, prefix)
+        mip_svcs = {k: v for k, v in services.items() if "inttest-multiip-svc" in k}
+        assert len(mip_svcs) == 2, f"Expected 2 services, got {list(mip_svcs.keys())}"
+
+        # Check IPs and tags
+        ips = {v["Address"] for v in mip_svcs.values()}
+        assert ips == {"127.0.0.1", "127.0.0.2"}
+
+        for svc_id, svc in mip_svcs.items():
+            if svc["Address"] == "127.0.0.1":
+                assert "physical" in svc["Tags"]
+                assert svc_id.endswith("@physical")
+            else:
+                assert "virtual" in svc["Tags"]
+                assert svc_id.endswith("@virtual")
+
+        # Verify each instance has its own health check
+        checks_resp = requests.get(f"http://127.0.0.1:{CONSUL_PORT}/v1/agent/checks")
+        checks = checks_resp.json()
+        mip_checks = {k: v for k, v in checks.items() if v.get("ServiceID", "") in mip_svcs}
+        assert len(mip_checks) == 2
+
+        # Cleanup
+        container.stop(timeout=1)
+        container.remove(force=True)
+        sr.containers.clear()
+        sr.sync_with_containers()
+
+        services = _services_with_prefix(consul, prefix)
+        mip_svcs = {k: v for k, v in services.items() if "inttest-multiip-svc" in k}
+        assert len(mip_svcs) == 0
 
 
 class TestMainLoopIntegration:
