@@ -20,6 +20,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import UserDict
+from typing import Any
 import logging
 import signal
 import sys
@@ -28,8 +29,8 @@ import sys
 log = logging.getLogger("serviceregistrator")
 
 
-class ContainerMetadata(UserDict):
-    def __setitem__(self, key, value):
+class ContainerMetadata(UserDict[str, Any]):
+    def __setitem__(self, key: str, value: Any) -> None:  # type: ignore[override]
         # all keys are lowered
         key = key.lower()
         if key in ("tags",):
@@ -116,9 +117,9 @@ class Context:
         if self.serviceregistrator:
             self.serviceregistrator.sync_with_containers()
 
-    def configure_logging(self, options):
+    def configure_logging(self, options: dict[str, Any]) -> None:
         console_handler = logging.StreamHandler(sys.stderr)
-        handlers = [console_handler]
+        handlers: list[logging.Handler] = [console_handler]
         logfile = self.options["logfile"]
         if logfile:
             try:

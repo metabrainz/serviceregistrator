@@ -21,6 +21,7 @@
 
 import click
 import docker
+import docker.errors
 import logging
 import traceback
 from time import sleep

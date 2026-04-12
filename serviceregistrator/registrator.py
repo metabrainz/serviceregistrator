@@ -60,7 +60,7 @@ Container.health = health
 # fancier logging, Container.__repr__ is only returning short_id
 # https://github.com/docker/docker-py/blob/a48a5a9647761406d66e8271f19fab7fa0c5f582/docker/models/resource.py#L20
 # Add container name
-Container.__repr__ = lambda self: f"<{self.__class__.__name__}: {self.name} ({self.short_id})>"
+Container.__repr__ = lambda self: f"<{self.__class__.__name__}: {self.name} ({self.short_id})>"  # type: ignore[assignment]
 
 
 # Monkey patch default requests user agent
@@ -82,7 +82,7 @@ def my_default_user_agent(name="python-requests"):
     return _USER_AGENT
 
 
-requests.utils.default_user_agent = my_default_user_agent
+requests.utils.default_user_agent = my_default_user_agent  # type: ignore[assignment]
 
 
 class ConsulConnectionError(Exception):

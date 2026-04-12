@@ -43,5 +43,8 @@ jobs:
       - name: Check formatting with ruff
         run: |
           uv run ruff format --check serviceregistrator tests
+      - name: Type check with ty
+        run: |
+          uvx ty check serviceregistrator
 
 # vim: set shiftwidth=2 tabstop=2 softtabstop=-1 expandtab:
