@@ -144,8 +144,7 @@ class ContainerInfo:
     def _has_multiple_ips(self, port: Any) -> bool:
         """Check if this (external port, protocol) is bound to multiple IPs."""
         count = sum(
-            1 for p in self.ports
-            if p.external == port.external and p.protocol == port.protocol and p.ip != port.ip
+            1 for p in self.ports if p.external == port.external and p.protocol == port.protocol and p.ip != port.ip
         )
         return count > 0
 

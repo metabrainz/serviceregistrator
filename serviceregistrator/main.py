@@ -78,7 +78,14 @@ POSSIBLE_LEVELS = (
 
 
 @click.command()
-@click.option("-i", "--ip", help="address for services (IP or IP@TAG, repeatable)", required=True, multiple=True, callback=parse_ip_tags)
+@click.option(
+    "-i",
+    "--ip",
+    help="address for services (IP or IP@TAG, repeatable)",
+    required=True,
+    multiple=True,
+    callback=parse_ip_tags,
+)
 @click.option("-t", "--tags", help="comma-separated list of tags to append to all registered services", default="")
 @click.option("-h", "--consul-host", help="consul agent host", default="127.0.0.1", show_default=True)
 @click.option("-p", "--consul-port", help="consul agent port", default=8500, type=click.INT, show_default=True)

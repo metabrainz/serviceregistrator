@@ -357,9 +357,7 @@ class TestServiceRegistratorIntegration:
         alias_svcs = {k: v for k, v in services.items() if "inttest-alias-svc" in k}
         assert len(alias_svcs) == 0
 
-
     def test_sync_multi_ip_with_tags(self, consul, docker_client, cleanup_containers):
-        hostname = socket.gethostname()
         prefix = "inttest-mip"
 
         container = docker_client.containers.run(
@@ -375,8 +373,6 @@ class TestServiceRegistratorIntegration:
         )
         cleanup_containers(container)
         container.reload()
-
-        host_port = int(container.ports["80/tcp"][0]["HostPort"])
 
         sr = _make_sr(prefix, ip_tags=[ServiceIP("127.0.0.1", "physical"), ServiceIP("127.0.0.2", "virtual")])
         sr.sync_with_containers()

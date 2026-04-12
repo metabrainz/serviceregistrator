@@ -56,13 +56,17 @@ class TestIsOurIdentifier(unittest.TestCase):
 
     def test_4elems_same_hostname_same_prefix_tag(self):
         """IP tag (after @) is stripped before parsing."""
-        yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z@physical", prefix="abc")
+        yes, comment = self.registrator.is_our_identifier(
+            "abc:" + self.registrator.hostname + ":y:z@physical", prefix="abc"
+        )
         self.assertTrue(yes)
         self.assertIsNone(comment)
 
     def test_4elems_same_hostname_same_prefix_unknown_suffix(self):
         """An unknown : suffix is rejected."""
-        yes, comment = self.registrator.is_our_identifier("abc:" + self.registrator.hostname + ":y:z:unknown", prefix="abc")
+        yes, comment = self.registrator.is_our_identifier(
+            "abc:" + self.registrator.hostname + ":y:z:unknown", prefix="abc"
+        )
         self.assertFalse(yes)
         self.assertEqual(comment, "unexpected suffix")
 
