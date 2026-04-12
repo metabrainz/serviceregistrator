@@ -212,8 +212,8 @@ class ServiceRegistrator:
                 for exposed_port in exposed_ports:
                     port, protocol = exposed_port.split("/")
                     ports.append(Ports(internal=int(port), external=int(port), protocol=protocol, ip="0.0.0.0"))
-        elif networkmode in ("bridge", "default"):
-            # Extract runtime port mappings, relevant when using --net=bridge
+        else:
+            # Extract runtime port mappings for bridge, default, and custom networks
             port_data = None
             try:
                 port_data = container.attrs["NetworkSettings"]["Ports"]

@@ -89,24 +89,12 @@ class TestExtractPortsBridge(TestExtractPortsDefault):
         self.container.attrs["HostConfig"]["NetworkMode"] = "bridge"
 
 
-class TestExtractPortsOther(TestExtractPortsDefault):
+class TestExtractPortsCustomNetwork(TestExtractPortsDefault):
+    """Custom network modes (e.g. docker-compose networks) use the same port mapping as bridge."""
+
     def setUp(self):
         super().setUp()
-        self.container.attrs["HostConfig"]["NetworkMode"] = "other"
-
-    def test_extract_ports(self):
-        ports = ServiceRegistrator.extract_ports(self.container)
-        self.assertEqual(ports, [])
-
-    def test_extract_ports_no_port_no_bindings(self):
-        ports = ServiceRegistrator.extract_ports(self.container)
-        self.assertEqual(ports, [])
-
-    def test_extract_ports_no_port_but_bindings(self):
-        self.container.attrs["HostConfig"]["PortBindings"] = self.container.attrs["NetworkSettings"]["Ports"].copy()
-        self.container.attrs["NetworkSettings"]["Ports"] = {}
-        ports = ServiceRegistrator.extract_ports(self.container)
-        self.assertEqual(ports, [])
+        self.container.attrs["HostConfig"]["NetworkMode"] = "my_custom_network"
 
 
 class TestExtractPortsHost(unittest.TestCase):
