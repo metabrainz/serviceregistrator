@@ -20,6 +20,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import defaultdict
+import ipaddress
 import logging
 
 from serviceregistrator.service import Service
@@ -115,6 +116,15 @@ class ContainerInfo:
             parts.append(str(port.protocol))
         return self.SERVICE_ID_SEPARATOR.join(parts)
 
+    @staticmethod
+    def _validate_ip(ip):
+        """Validate IP address to prevent injection via SERVICE_IP."""
+        try:
+            ipaddress.ip_address(ip)
+            return True
+        except ValueError:
+            return False
+
     def build_service_ip(self, port):
         ip = self.get_attr("ip", port.internal)
         if ip is None:
@@ -122,8 +132,11 @@ class ContainerInfo:
                 return port.ip
             else:
                 return self.serviceip
-        else:
+        elif self._validate_ip(ip):
             return ip
+        else:
+            log.warning(f"Invalid SERVICE_IP '{ip}' for {self}, using default")
+            return self.serviceip
 
     @property
     def services(self):

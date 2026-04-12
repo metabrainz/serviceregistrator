@@ -120,3 +120,37 @@ class TestServicesDuplicateName(unittest.TestCase):
         ci.build_service_name = lambda port: "svc"
         services = ci.services
         assert len(services) == 1
+
+
+class TestBuildServiceIpValidation(unittest.TestCase):
+    def _make_ci(self, service_ip_override):
+        return ContainerInfo(
+            "cid",
+            "name",
+            [Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0")],
+            ContainerMetadata({"name": "svc", "ip": service_ip_override}),
+            {},
+            "host",
+            "127.0.0.1",
+            [],
+        )
+
+    def test_valid_ipv4(self):
+        ci = self._make_ci("10.0.0.1")
+        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        assert ip == "10.0.0.1"
+
+    def test_valid_ipv6(self):
+        ci = self._make_ci("::1")
+        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        assert ip == "::1"
+
+    def test_invalid_ip_shell_injection(self):
+        ci = self._make_ci("$(whoami)")
+        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        assert ip == "127.0.0.1"  # falls back to default
+
+    def test_invalid_ip_arbitrary_string(self):
+        ci = self._make_ci("not-an-ip; rm -rf /")
+        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        assert ip == "127.0.0.1"
