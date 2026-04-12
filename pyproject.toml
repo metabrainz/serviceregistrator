@@ -13,7 +13,6 @@ classifiers = [
 dependencies = [
     "click>=7.1.2",
     "docker>=4.4.1",
-    "python-consul2>=0.1.5",
     "requests>=2.20.0",
     "urllib3>=1.26.0",
 ]

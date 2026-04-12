@@ -1,4 +1,3 @@
-import pytest
 import unittest
 from serviceregistrator.service import Service
 from serviceregistrator.servicecheck import ServiceCheck
@@ -117,20 +116,20 @@ class TestServiceCheckHttp(unittest.TestCase):
         check = ServiceCheck.http(self.dummyservice, params)
         self.assertNotIn("Body", check)
 
-    def test_check_http_unsupported_body(self):
+    def test_check_http_body_always_included(self):
         ServiceCheck.consul_version = (1, 0, 0)
         params = self.params_http
         check = ServiceCheck.http(self.dummyservice, params)
-        # body isn't supported, check should be None
-        self.assertIsNone(check)
+        # Body is now always included regardless of consul version
+        self.assertEqual(check["Body"], params["body"])
 
-    def test_check_http_unsupported_method(self):
+    def test_check_http_method_always_included(self):
         ServiceCheck.consul_version = (0, 8, 4)
         params = self.params_http
         del params["body"]
         check = ServiceCheck.http(self.dummyservice, params)
-        # method isn't supported, check should be None
-        self.assertIsNone(check)
+        # Method is now always included regardless of consul version
+        self.assertEqual(check["Method"], "HEAD")
 
     def test_check_http_invalid_header(self):
         params = self.params_http
@@ -239,12 +238,12 @@ class TestServiceCheckScript(unittest.TestCase):
         check = ServiceCheck.script(self.dummyservice, params)
         self.assertIsNone(check)
 
-    def test_check_script_consul_1(self):
+    def test_check_script_old_consul(self):
         ServiceCheck.consul_version = (0, 9, 6)
         params = self.params_script
-        with pytest.deprecated_call():
-            check = ServiceCheck.script(self.dummyservice, params)
-        self.assertEqual(check["script"], "command arg1 arg2")
+        check = ServiceCheck.script(self.dummyservice, params)
+        # Always uses args now, no compat for old consul
+        self.assertEqual(check["args"], ["command", "arg1", "arg2"])
         self.assertEqual(check["interval"], "5s")
         self.assertEqual(len(check), 2)
 
@@ -276,13 +275,12 @@ class TestServiceCheckDocker(unittest.TestCase):
         check = ServiceCheck.docker(self.dummyservice, params)
         self.assertIsNone(check)
 
-    def test_check_docker_consul_1(self):
+    def test_check_docker_old_consul(self):
         ServiceCheck.consul_version = (0, 9, 6)
         params = self.params_docker
         check = ServiceCheck.docker(self.dummyservice, params)
-        print(check)
-        # {'docker_container_id': 'deadbeef', 'shell': '/bin/sh', 'interval': '5s', 'args': ['command', 'arg1', 'arg2']}
-        self.assertEqual(check["script"], "command arg1 arg2")
+        # Always uses args now, no compat for old consul
+        self.assertEqual(check["args"], ["command", "arg1", "arg2"])
         self.assertEqual(check["docker_container_id"], "deadbeef")
         self.assertEqual(check["shell"], "/bin/sh")
         self.assertEqual(check["interval"], "5s")

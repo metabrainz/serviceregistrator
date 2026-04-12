@@ -20,9 +20,7 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from consul import ConsulException
 from docker.models.containers import Container
-import consul
 import copy
 import docker
 import logging
@@ -33,6 +31,7 @@ import socket
 from requests.exceptions import ConnectionError
 
 from serviceregistrator import ContainerMetadata
+from serviceregistrator.consul_client import ConsulClient
 from serviceregistrator.servicecheck import ServiceCheck
 from serviceregistrator.service import Service
 from serviceregistrator.containerinfo import ContainerInfo
@@ -144,13 +143,13 @@ class ServiceRegistrator:
         port = self.context.options["consul_port"]
 
         try:
-            self.consul_client = consul.Consul(host=host, port=port)
-            peers = self.consul_client.status.peers()
-            agent_self = self.consul_client.agent.self()
+            self.consul_client = ConsulClient(host=host, port=port)
+            peers = self.consul_client.status_peers()
+            agent_self = self.consul_client.agent_self()
             self.consul_version = agent_self["Config"]["Version"]
             ServiceCheck.consul_version = tuple(map(int, self.consul_version.split(".")))
             log.info(f"Using Consul Agent {self.consul_version} at {host}:{port} (peers:{peers})")
-        except (ConnectionError, ConsulException) as e:
+        except (ConnectionError, requests.HTTPError) as e:
             raise ConsulConnectionError(e)
 
     @staticmethod
@@ -445,7 +444,7 @@ class ServiceRegistrator:
         log.info(f"REGISTER SERVICE {service}")
         log.debug(repr(service))
         try:
-            self.consul_client.agent.service.register(
+            self.consul_client.agent_service_register(
                 name=service.name,
                 service_id=service.id,
                 address=service.ip,
@@ -468,7 +467,7 @@ class ServiceRegistrator:
             service_id = service
             log.info(f"UNREGISTER SERVICE with id {service_id}")
         try:
-            self.consul_client.agent.service.deregister(service_id)
+            self.consul_client.agent_service_deregister(service_id)
         except ConnectionError as e:
             raise ConsulConnectionError(e)
         except Exception as e:
@@ -534,7 +533,7 @@ class ServiceRegistrator:
 
     def consul_services(self):
         try:
-            return self.consul_client.agent.services()
+            return self.consul_client.agent_services()
         except ConnectionError as e:
             raise ConsulConnectionError(e)
         except Exception as e:

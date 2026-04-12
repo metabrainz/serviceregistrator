@@ -35,7 +35,7 @@ docker run --rm serviceregistrator --help
 ## References
 
 - https://docker-py.readthedocs.io/en/stable/
-- https://python-consul2.readthedocs.io/en/latest/
+- https://developer.hashicorp.com/consul/api-docs
 
 
 # Usage

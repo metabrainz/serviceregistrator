@@ -1,5 +1,8 @@
 import unittest
 from unittest.mock import Mock, patch
+
+import requests
+
 from serviceregistrator.registrator import (
     ServiceRegistrator,
     ConsulConnectionError,
@@ -324,21 +327,21 @@ class TestConsulRegisterService(unittest.TestCase):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
         sr.consul_register_service(service)
-        sr.consul_client.agent.service.register.assert_called_once()
+        sr.consul_client.agent_service_register.assert_called_once()
 
     def test_register_connection_error(self):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
         from requests.exceptions import ConnectionError
 
-        sr.consul_client.agent.service.register.side_effect = ConnectionError("fail")
+        sr.consul_client.agent_service_register.side_effect = ConnectionError("fail")
         with self.assertRaises(ConsulConnectionError):
             sr.consul_register_service(service)
 
     def test_register_other_exception(self):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
-        sr.consul_client.agent.service.register.side_effect = Exception("fail")
+        sr.consul_client.agent_service_register.side_effect = Exception("fail")
         # Should not raise, just log
         sr.consul_register_service(service)
 
@@ -348,24 +351,24 @@ class TestConsulUnregisterService(unittest.TestCase):
         sr = make_registrator()
         service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={})
         sr.consul_unregister_service(service)
-        sr.consul_client.agent.service.deregister.assert_called_once_with("sid")
+        sr.consul_client.agent_service_deregister.assert_called_once_with("sid")
 
     def test_unregister_string_id(self):
         sr = make_registrator()
         sr.consul_unregister_service("some-service-id")
-        sr.consul_client.agent.service.deregister.assert_called_once_with("some-service-id")
+        sr.consul_client.agent_service_deregister.assert_called_once_with("some-service-id")
 
     def test_unregister_connection_error(self):
         sr = make_registrator()
         from requests.exceptions import ConnectionError
 
-        sr.consul_client.agent.service.deregister.side_effect = ConnectionError("fail")
+        sr.consul_client.agent_service_deregister.side_effect = ConnectionError("fail")
         with self.assertRaises(ConsulConnectionError):
             sr.consul_unregister_service("sid")
 
     def test_unregister_other_exception(self):
         sr = make_registrator()
-        sr.consul_client.agent.service.deregister.side_effect = Exception("fail")
+        sr.consul_client.agent_service_deregister.side_effect = Exception("fail")
         sr.consul_unregister_service("sid")
 
 
@@ -420,9 +423,8 @@ class TestSyncWithContainers(unittest.TestCase):
 class TestCleanup(unittest.TestCase):
     def test_cleanup_removes_stale_services(self):
         sr = make_registrator()
-        # A service registered in consul that belongs to us but not in containers
         stale_id = "testhost:oldcontainer:8080"
-        sr.consul_client.agent.services.return_value = {stale_id: {}}
+        sr.consul_client.agent_services.return_value = {stale_id: {}}
         sr.consul_unregister_service = Mock()
         sr.cleanup()
         sr.consul_unregister_service.assert_called_once_with(stale_id)
@@ -430,8 +432,7 @@ class TestCleanup(unittest.TestCase):
     def test_cleanup_keeps_active_services(self):
         sr = make_registrator()
         active_id = "testhost:mycontainer:8080"
-        sr.consul_client.agent.services.return_value = {active_id: {}}
-        # Simulate container tracking this service
+        sr.consul_client.agent_services.return_value = {active_id: {}}
         ci = Mock()
         ci.service_identifiers.return_value = [active_id]
         sr.containers["cid1"] = ci
@@ -441,7 +442,7 @@ class TestCleanup(unittest.TestCase):
 
     def test_cleanup_skips_foreign_services(self):
         sr = make_registrator()
-        sr.consul_client.agent.services.return_value = {"otherhost:svc:80": {}}
+        sr.consul_client.agent_services.return_value = {"otherhost:svc:80": {}}
         sr.consul_unregister_service = Mock()
         sr.cleanup()
         sr.consul_unregister_service.assert_not_called()
@@ -449,7 +450,7 @@ class TestCleanup(unittest.TestCase):
     def test_cleanup_with_prefix(self):
         sr = make_registrator(service_prefix="pfx")
         stale_id = "pfx:testhost:oldcontainer:8080"
-        sr.consul_client.agent.services.return_value = {stale_id: {}}
+        sr.consul_client.agent_services.return_value = {stale_id: {}}
         sr.consul_unregister_service = Mock()
         sr.cleanup()
         sr.consul_unregister_service.assert_called_once_with(stale_id)
@@ -458,7 +459,7 @@ class TestCleanup(unittest.TestCase):
 class TestConsulServices(unittest.TestCase):
     def test_success(self):
         sr = make_registrator()
-        sr.consul_client.agent.services.return_value = {"svc1": {}}
+        sr.consul_client.agent_services.return_value = {"svc1": {}}
         result = sr.consul_services()
         assert result == {"svc1": {}}
 
@@ -466,13 +467,13 @@ class TestConsulServices(unittest.TestCase):
         sr = make_registrator()
         from requests.exceptions import ConnectionError
 
-        sr.consul_client.agent.services.side_effect = ConnectionError("fail")
+        sr.consul_client.agent_services.side_effect = ConnectionError("fail")
         with self.assertRaises(ConsulConnectionError):
             sr.consul_services()
 
     def test_other_exception(self):
         sr = make_registrator()
-        sr.consul_client.agent.services.side_effect = Exception("fail")
+        sr.consul_client.agent_services.side_effect = Exception("fail")
         result = sr.consul_services()
         assert result == {}
 
@@ -497,10 +498,10 @@ class TestContainersServiceIdentifiers(unittest.TestCase):
 class TestInitConsul(unittest.TestCase):
     def test_init_consul_success(self):
         sr = make_registrator()
-        mock_consul = Mock()
-        mock_consul.status.peers.return_value = ["127.0.0.1:8300"]
-        mock_consul.agent.self.return_value = {"Config": {"Version": "1.9.5"}}
-        with patch("serviceregistrator.registrator.consul.Consul", return_value=mock_consul):
+        mock_client = Mock()
+        mock_client.status_peers.return_value = ["127.0.0.1:8300"]
+        mock_client.agent_self.return_value = {"Config": {"Version": "1.9.5"}}
+        with patch("serviceregistrator.registrator.ConsulClient", return_value=mock_client):
             sr._init_consul()
         assert sr.consul_version == "1.9.5"
         from serviceregistrator.servicecheck import ServiceCheck
@@ -511,17 +512,15 @@ class TestInitConsul(unittest.TestCase):
         sr = make_registrator()
         from requests.exceptions import ConnectionError
 
-        with patch("serviceregistrator.registrator.consul.Consul", side_effect=ConnectionError("fail")):
+        with patch("serviceregistrator.registrator.ConsulClient", side_effect=ConnectionError("fail")):
             with self.assertRaises(ConsulConnectionError):
                 sr._init_consul()
 
-    def test_init_consul_consul_exception(self):
+    def test_init_consul_http_error(self):
         sr = make_registrator()
-        from consul import ConsulException
-
-        mock_consul = Mock()
-        mock_consul.status.peers.side_effect = ConsulException("fail")
-        with patch("serviceregistrator.registrator.consul.Consul", return_value=mock_consul):
+        mock_client = Mock()
+        mock_client.status_peers.side_effect = requests.HTTPError("fail")
+        with patch("serviceregistrator.registrator.ConsulClient", return_value=mock_client):
             with self.assertRaises(ConsulConnectionError):
                 sr._init_consul()
 

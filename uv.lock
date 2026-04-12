@@ -359,19 +359,6 @@ wheels = [
 ]
 
 [[package]]
-name = "python-consul2"
-version = "0.1.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/a3/bc0bdf7e0a68a1fa8e7a2302491e1931438a6d08ed21bd6830ba1595671b/python-consul2-0.1.5.tar.gz", hash = "sha256:29c859de73e17f36ab99be831fdc1d924f16e8772233277a28ef92b7b99995cd", size = 31445, upload-time = "2020-10-20T06:19:54.982Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/52/5230ba94ededbfafa9df95c19f1272cf03916b6d33fce341936e3c74dd86/python_consul2-0.1.5-py2.py3-none-any.whl", hash = "sha256:ff8c6642c5a8d5f13a072e90adbad44cde824fc46fb2ab76b40dd1c77d6c0c41", size = 30002, upload-time = "2020-10-20T06:19:53.7Z" },
-]
-
-[[package]]
 name = "pywin32"
 version = "311"
 source = { registry = "https://pypi.org/simple" }
@@ -440,7 +427,6 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "docker" },
-    { name = "python-consul2" },
     { name = "requests" },
     { name = "urllib3" },
 ]
@@ -456,7 +442,6 @@ dev = [
 requires-dist = [
     { name = "click", specifier = ">=7.1.2" },
     { name = "docker", specifier = ">=4.4.1" },
-    { name = "python-consul2", specifier = ">=0.1.5" },
     { name = "requests", specifier = ">=2.20.0" },
     { name = "urllib3", specifier = ">=1.26.0" },
 ]
@@ -466,15 +451,6 @@ dev = [
     { name = "pytest", specifier = ">=6.2.2" },
     { name = "pytest-cov", specifier = ">=2.11.1" },
     { name = "ruff", specifier = ">=0.11" },
-]
-
-[[package]]
-name = "six"
-version = "1.17.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
 
 [[package]]
