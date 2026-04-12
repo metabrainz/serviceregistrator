@@ -25,7 +25,7 @@ Repository = "https://github.com/metabrainz/serviceregistrator"
 
 [dependency-groups]
 dev = [
-    "pytest>=6.2.2",
+    "pytest>=9.0.3",
     "pytest-cov>=2.11.1",
     "ruff>=0.11",
 ]
