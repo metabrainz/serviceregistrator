@@ -382,7 +382,7 @@ wheels = [
 
 [[package]]
 name = "requests"
-version = "2.28.2"
+version = "2.33.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -390,9 +390,9 @@ dependencies = [
     { name = "idna" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/ee/391076f5937f0a8cdf5e53b701ffc91753e87b07d66bae4a09aa671897bf/requests-2.28.2.tar.gz", hash = "sha256:98b1b2782e3c6c4904938b84c0eb932721069dfdb9134313beff7c83c2df24bf", size = 108206, upload-time = "2023-01-12T16:24:54.687Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/a4/98b9c7c6428a668bf7e42ebb7c79d576a1c3c1e3ae2d47e674b468388871/requests-2.33.1.tar.gz", hash = "sha256:18817f8c57c6263968bc123d237e3b8b08ac046f5456bd1e307ee8f4250d3517", size = 134120, upload-time = "2026-03-30T16:09:15.531Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/f4/274d1dbe96b41cf4e0efb70cbced278ffd61b5c7bb70338b62af94ccb25b/requests-2.28.2-py3-none-any.whl", hash = "sha256:64299f4909223da747622c030b781c0d7811e359c37124b4bd368fb8c6518baa", size = 62822, upload-time = "2023-01-12T16:24:52.241Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/8e/7540e8a2036f79a125c1d2ebadf69ed7901608859186c856fa0388ef4197/requests-2.33.1-py3-none-any.whl", hash = "sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a", size = 64947, upload-time = "2026-03-30T16:09:13.83Z" },
 ]
 
 [[package]]
@@ -422,7 +422,7 @@ wheels = [
 
 [[package]]
 name = "serviceregistrator"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -440,17 +440,17 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=7.1.2" },
+    { name = "click", specifier = ">=8.3.2" },
     { name = "docker", specifier = ">=4.4.1" },
-    { name = "requests", specifier = ">=2.20.0" },
+    { name = "requests", specifier = ">=2.33.1" },
     { name = "urllib3", specifier = ">=1.26.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pytest", specifier = ">=6.2.2" },
-    { name = "pytest-cov", specifier = ">=2.11.1" },
-    { name = "ruff", specifier = ">=0.11" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "ruff", specifier = ">=0.15.10" },
 ]
 
 [[package]]
