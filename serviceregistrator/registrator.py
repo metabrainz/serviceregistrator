@@ -20,11 +20,11 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from collections import namedtuple
-from consul import ConsulException
 from docker.models.containers import Container
-import consul
+from typing import Any
 import copy
 import docker
+import docker.errors
 import logging
 import traceback
 import re
@@ -33,89 +33,92 @@ import socket
 from requests.exceptions import ConnectionError
 
 from serviceregistrator import ContainerMetadata
+from serviceregistrator.consul_client import ConsulClient
 from serviceregistrator.servicecheck import ServiceCheck
 from serviceregistrator.service import Service
 from serviceregistrator.containerinfo import ContainerInfo
 
 
-log = logging.getLogger('serviceregistrator')
+log = logging.getLogger("serviceregistrator")
 
 
 # Monkey Patch
 # @see https://github.com/docker/docker-py/pull/1726
+
 
 @property
 def health(self):
     """
     The health of the app in the container.
     """
-    if self.attrs['State'].get('Health') is not None:
-        return self.attrs['State']['Health']['Status']
+    if self.attrs["State"].get("Health") is not None:
+        return self.attrs["State"]["Health"]["Status"]
     else:
-        return 'none'
+        return "none"
 
 
-Container.health = health
+Container.health = health  # ty: ignore[invalid-assignment]
 
 # fancier logging, Container.__repr__ is only returning short_id
 # https://github.com/docker/docker-py/blob/a48a5a9647761406d66e8271f19fab7fa0c5f582/docker/models/resource.py#L20
 # Add container name
-Container.__repr__ = lambda self: f"<{self.__class__.__name__}: {self.name} ({self.short_id})>"
+Container.__repr__ = lambda self: f"<{self.__class__.__name__}: {self.name} ({self.short_id})>"  # ty: ignore[invalid-assignment]
 
 
 # Monkey patch default requests user agent
-_USER_AGENT = None
+_USER_AGENT: str | None = None
 
 
-def my_default_user_agent(name="python-requests"):
+def my_default_user_agent(name: str = "python-requests") -> str:
     global _USER_AGENT
 
     if _USER_AGENT is None:
         from importlib.metadata import version
         import platform
-        _USER_AGENT = 'ServiceRegistrator/%s Python %s %s' % (
-            version('serviceregistrator'),
+
+        _USER_AGENT = "ServiceRegistrator/%s Python %s %s" % (
+            version("serviceregistrator"),
             platform.python_version(),
-            platform.system()
+            platform.system(),
         )
     return _USER_AGENT
 
 
-requests.utils.default_user_agent = my_default_user_agent
+requests.utils.default_user_agent = my_default_user_agent  # ty: ignore[invalid-assignment]
 
 
 class ConsulConnectionError(Exception):
-    def __init__(self, msg, *args, **kwargs):
-        super().__init__(f'Consul connection error: {msg}', *args, **kwargs)
+    def __init__(self, msg: Any, *args: Any, **kwargs: Any) -> None:
+        super().__init__(f"Consul connection error: {msg}", *args, **kwargs)
 
 
-SERVICE_PORT_REGEX = re.compile(r'(?P<port>\d+)_(?P<key>.+)$')
-SERVICE_KEY_REGEX = re.compile(r'SERVICE_(?P<key>.+)$')
-SERVICE_KEYVAL_REGEX = re.compile(r'SERVICE_(?P<key>[^=]+)=(?P<value>.*)$')
+SERVICE_PORT_REGEX = re.compile(r"(?P<port>\d+)_(?P<key>.+)$")
+SERVICE_KEY_REGEX = re.compile(r"SERVICE_(?P<key>.+)$")
+SERVICE_KEYVAL_REGEX = re.compile(r"SERVICE_(?P<key>[^=]+)=(?P<value>.*)$")
 
 # https://www.consul.io/docs/discovery/services#service-and-tag-names-with-dns
 # https://github.com/hashicorp/consul-template/blob/870905de57f085588c3b718b779d8550aefc5dcf/dependency/catalog_service.go#L18
 # we only allow word characters, dashes & underscores in tags and service name
-SERVICE_NAME_REGEX = re.compile(r'^[\w_-]+$')
-SERVICE_TAG_REGEX = re.compile(r'^\s*(?P<tag>[\w_-]+)\s*$')
+SERVICE_NAME_REGEX = re.compile(r"^[\w_-]+$")
+SERVICE_TAG_REGEX = re.compile(r"^\s*(?P<tag>[\w_-]+)\s*$")
 
-Ports = namedtuple('Ports', ('internal', 'external', 'protocol', 'ip'))
+Ports = namedtuple("Ports", ("internal", "external", "protocol", "ip"))
 
 
 class ServiceRegistrator:
     unregister_actions = {
-        'die',
-        'health_status: unhealthy',
-        'pause',
+        "die",
+        "health_status: unhealthy",
+        "pause",
     }
     register_actions = {
-        'health_status: healthy',
-        'start',
-        'unpause',
+        "health_status: healthy",
+        "start",
+        "unpause",
     }
     handled_actions = unregister_actions | register_actions
 
-    def __init__(self, context):
+    def __init__(self, context: Any) -> None:
         self.context = context
         self.hostname = socket.gethostname()
 
@@ -126,36 +129,36 @@ class ServiceRegistrator:
         log.info(f"Options: {context.options}")
         self.syncing = False
 
-    def _init_docker(self):
+    def _init_docker(self) -> None:
         self.docker_client = docker.from_env()
-        self.docker_api_client = docker.APIClient(base_url='unix://' + self.context.options['dockersock'])
         self.events = self.docker_client.events(decode=True)
 
         def close_events():
             log.debug("close events")
             self.events.close()
-        self.context.register_on_exit('close_events', close_events)
 
-    def _init_consul(self):
-        host = self.context.options['consul_host']
-        port = self.context.options['consul_port']
+        self.context.register_on_exit("close_events", close_events)
+
+    def _init_consul(self) -> None:
+        host = self.context.options["consul_host"]
+        port = self.context.options["consul_port"]
 
         try:
-            self.consul_client = consul.Consul(host=host, port=port)
-            peers = self.consul_client.status.peers()
-            agent_self = self.consul_client.agent.self()
-            self.consul_version = agent_self['Config']['Version']
-            ServiceCheck.consul_version = tuple(map(int, self.consul_version.split('.')))
+            self.consul_client = ConsulClient(host=host, port=port)
+            peers = self.consul_client.status_peers()
+            agent_self = self.consul_client.agent_self()
+            self.consul_version = agent_self["Config"]["Version"]
+            ServiceCheck.consul_version = tuple(map(int, self.consul_version.split(".")))
             log.info(f"Using Consul Agent {self.consul_version} at {host}:{port} (peers:{peers})")
-        except (ConnectionError, ConsulException) as e:
+        except (ConnectionError, requests.HTTPError) as e:
             raise ConsulConnectionError(e)
 
     @staticmethod
-    def fmtevent(action, etype, cid):
+    def fmtevent(action: str, etype: str, cid: str) -> str:
         return f"Event [{action}] type=[{etype}] cid=[{cid}]"
 
-    def watch_events(self):
-        debug = self.context.options['debug']
+    def watch_events(self) -> None:
+        debug = self.context.options["debug"]
         for event in self.events:
             if self.context.kill_now:
                 break
@@ -163,12 +166,12 @@ class ServiceRegistrator:
                 if debug:
                     log.debug("skip event, sync in progress...")
                 continue
-            action = event['Action']
-            etype = event['Type']
-            cid = event['Actor']['ID']
+            action = event["Action"]
+            etype = event["Type"]
+            cid = event["Actor"]["ID"]
 
             # with only listen for container events
-            if etype != 'container':
+            if etype != "container":
                 if debug:
                     log.debug(self.fmtevent(action, etype, cid))
                 continue
@@ -191,40 +194,35 @@ class ServiceRegistrator:
             elif action in self.unregister_actions:
                 self.unregister_container(container_info)
 
-    def docker_get_container_by_id(self, cid):
+    def docker_get_container_by_id(self, cid: str) -> Any:
         return self.docker_client.containers.get(cid)
 
     @staticmethod
-    def extract_ports(container):
-        """ Extract ports from container metadata"""
+    def extract_ports(container: Any) -> list[Any]:
+        """Extract ports from container metadata"""
 
         ports = list()
 
-        networkmode = container.attrs['HostConfig']['NetworkMode']
-        if networkmode == 'host':
+        networkmode = container.attrs["HostConfig"]["NetworkMode"]
+        if networkmode == "host":
             # Extract configured host port mappings, relevant when using --net=host
-            exposed_ports = container.attrs['Config']['ExposedPorts']
+            exposed_ports = container.attrs["Config"].get("ExposedPorts")
             if exposed_ports:
                 log.debug(f"Config ExposedPorts {container}: {exposed_ports!r}")
                 for exposed_port in exposed_ports:
-                    port, protocol = exposed_port.split('/')
-                    ports.append(Ports(
-                        internal=int(port),
-                        external=int(port),
-                        protocol=protocol,
-                        ip="0.0.0.0"
-                    ))
-        elif networkmode in ('bridge', 'default'):
-            # Extract runtime port mappings, relevant when using --net=bridge
+                    port, protocol = exposed_port.split("/")
+                    ports.append(Ports(internal=int(port), external=int(port), protocol=protocol, ip="0.0.0.0"))
+        else:
+            # Extract runtime port mappings for bridge, default, and custom networks
             port_data = None
             try:
-                port_data = container.attrs['NetworkSettings']['Ports']
+                port_data = container.attrs["NetworkSettings"]["Ports"]
                 log.debug(f"NetworkSettings Ports {container}: {port_data!r}")
             except KeyError:
                 pass
             if not port_data:
                 try:
-                    port_data = container.attrs['HostConfig']['PortBindings']
+                    port_data = container.attrs["HostConfig"]["PortBindings"]
                     log.debug(f"HostConfig PortBindings {container}: {port_data!r}")
                 except KeyError:
                     pass
@@ -237,57 +235,59 @@ class ServiceRegistrator:
                         # a port can be exposed in Dockerfile, but not published
                         # so "9300/tcp": None is possible
                         continue
-                    port, protocol = internal_port.split('/')
+                    port, protocol = internal_port.split("/")
                     for eport in external_ports:
-                        if ':' in eport['HostIp']:
+                        if ":" in eport["HostIp"]:
                             # FIXME: IPv6 addresses aren't supported yet
                             continue
-                        ports.append(Ports(
-                            internal=int(port),
-                            external=int(eport['HostPort']),
-                            protocol=protocol,
-                            ip=eport['HostIp']
-                        ))
+                        ports.append(
+                            Ports(
+                                internal=int(port),
+                                external=int(eport["HostPort"]),
+                                protocol=protocol,
+                                ip=eport["HostIp"],
+                            )
+                        )
         return ports
 
     @staticmethod
-    def parse_env(env):
+    def parse_env(env: list[str]) -> dict[str, str]:
         kv = dict()
         for elem in env:
             m = SERVICE_KEYVAL_REGEX.match(elem)
             if m:
-                key = m.group('key')
-                value = m.group('value')
+                key = m.group("key")
+                value = m.group("value")
                 kv[key] = value
         return kv
 
     @staticmethod
-    def parse_labels(labels):
+    def parse_labels(labels: dict[str, str]) -> dict[str, str]:
         kv = dict()
         for key, value in labels.items():
             m = SERVICE_KEY_REGEX.match(key)
             if m:
-                key = m.group('key')
+                key = m.group("key")
                 kv[key] = value
         return kv
 
     @staticmethod
-    def parse_tags_string(container, tags_string):
+    def parse_tags_string(container: Any, tags_string: str) -> list[str]:
         valid_tags = dict()  # we use a dict to preserve tags order, but it emulates a set
-        for tag in tags_string.split(','):
+        for tag in tags_string.split(","):
             if not tag:
                 # skip empty strings. When `tags_string` is empty, `split(',')` will return
                 # at least an empty string
                 continue
             m = SERVICE_TAG_REGEX.match(tag)
             if m:
-                valid_tags[m.group('tag')] = True
+                valid_tags[m.group("tag")] = True
             else:
                 log.warning(f"{container}: Invalid tag: '{tag}', ignoring")
-        return ','.join(valid_tags)
+        return list(valid_tags)
 
     @classmethod
-    def parse_service_meta(cls, container):
+    def parse_service_meta(cls, container: Any) -> tuple[Any, dict[int, Any]]:
         # extract SERVICE_* from container env
         # There are 2 forms: one without port, one with port
         # SERVICE_80_NAME=thisname
@@ -297,7 +297,7 @@ class ServiceRegistrator:
         # those with ports are stored in metadata_with_port[<port>]
 
         # read from env vars
-        kv_from_env = cls.parse_env(container.attrs['Config']['Env'])
+        kv_from_env = cls.parse_env(container.attrs["Config"]["Env"])
 
         # read from container labels
         kv_from_labels = cls.parse_labels(container.labels)
@@ -306,13 +306,13 @@ class ServiceRegistrator:
         metadata_with_port = dict()
 
         def validate_kv(key, value):
-            if key == 'NAME':
+            if key in ("NAME", "ALIAS"):
                 if not SERVICE_NAME_REGEX.match(value):
-                    log.warning(f"{container}: Invalid service name: '{value}', ignoring")
+                    log.warning(f"{container}: Invalid service {key.lower()}: '{value}', ignoring")
                     return None
                 else:
                     return value
-            elif key == 'TAGS':
+            elif key == "TAGS":
                 return cls.parse_tags_string(container, value)
             else:
                 return value
@@ -322,8 +322,8 @@ class ServiceRegistrator:
             m = SERVICE_PORT_REGEX.match(key)
             if m:
                 # matching SERVICE_<port>_
-                key = m.group('key')
-                port = int(m.group('port'))
+                key = m.group("key")
+                port = int(m.group("port"))
                 value = validate_kv(key, value)
                 if value:
                     if port not in metadata_with_port:
@@ -348,8 +348,12 @@ class ServiceRegistrator:
 
         return metadata, new_metadata_with_port
 
-    def parse_container_meta(self, cid):
-        container = self.docker_get_container_by_id(cid)
+    def parse_container_meta(self, cid: str) -> ContainerInfo | None:
+        try:
+            container = self.docker_get_container_by_id(cid)
+        except docker.errors.NotFound:
+            log.debug(f"Container {cid[:12]} not found (already removed?)")
+            return None
         metadata, metadata_with_port = self.parse_service_meta(container)
         if not metadata and not metadata_with_port:
             # skip containers without SERVICE_*
@@ -365,20 +369,21 @@ class ServiceRegistrator:
             log.info(f"skip {container}: no exposed ports")
             return None
         name = container.name
-        tags = self.parse_tags_string(container, self.context.options['tags'])
-        container_info = ContainerInfo(cid, name, ports, metadata, metadata_with_port,
-                                       self.hostname, self.context.options['ip'], tags)
-        if self.context.options['service_prefix']:
-            container_info.service_prefix = self.context.options['service_prefix']
+        tags = self.parse_tags_string(container, self.context.options["tags"])
+        container_info = ContainerInfo(
+            cid, name, ports, metadata, metadata_with_port, self.hostname, self.context.options["ip"], tags
+        )
+        if self.context.options["service_prefix"]:
+            container_info.service_prefix = self.context.options["service_prefix"]
         health = container.health
-        if health != 'none':
+        if health != "none":
             container_info.health = health
         return container_info
 
-    def docker_running_containers(self):
-        return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status='running'))
+    def docker_running_containers(self) -> list[Any]:
+        return self.docker_client.containers.list(all=True, sparse=True, filters=dict(status="running"))
 
-    def sync_with_containers(self):
+    def sync_with_containers(self) -> None:
         if self.syncing:
             # it can be called by signal
             return
@@ -398,20 +403,24 @@ class ServiceRegistrator:
         self.syncing = False
 
     @staticmethod
-    def make_check(service):
+    def make_check(service: Service) -> dict[str, Any] | None:
+        # Alias services get an alias health check
+        if service.alias_of:
+            return {"AliasService": service.alias_of}
+
         checks = {
-            'docker': ServiceCheck.docker,
-            'http': ServiceCheck.http,
-            'https': ServiceCheck.https,
-            'script': ServiceCheck.script,
-            'tcp': ServiceCheck.tcp,
-            'ttl': ServiceCheck.ttl,
+            "docker": ServiceCheck.docker,
+            "http": ServiceCheck.http,
+            "https": ServiceCheck.https,
+            "script": ServiceCheck.script,
+            "tcp": ServiceCheck.tcp,
+            "ttl": ServiceCheck.ttl,
         }
         valid_checks = set(checks)
         check = None
         params = {}
         for key, value in service.attrs.items():
-            if key.startswith('check_'):
+            if key.startswith("check_"):
                 k = key[6:]
                 params[k] = value
                 if check is None and k in valid_checks:
@@ -428,37 +437,36 @@ class ServiceRegistrator:
         return None
 
     @staticmethod
-    def service_meta(service):
+    def service_meta(service: Service) -> dict[str, str]:
         meta = {}
         for k, v in service.attrs.items():
-            if k.startswith('check_'):
+            if k.startswith("check_"):
                 # ignore SERVICE_CHECK_*
                 continue
-            if k == 'ip':
-                # ignore SERVICE_IP
+            if k in ("ip", "alias"):
                 continue
             meta[k] = v
         return meta
 
-    def consul_register_service(self, service):
+    def consul_register_service(self, service: Service) -> bool:
         log.info(f"REGISTER SERVICE {service}")
         log.debug(repr(service))
         try:
-            self.consul_client.agent.service.register(
+            self.consul_client.agent_service_register(
                 name=service.name,
                 service_id=service.id,
                 address=service.ip,
                 port=service.port,
                 tags=service.tags,
                 meta=self.service_meta(service),
-                check=self.make_check(service)
+                check=self.make_check(service),
             )
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
+            return True
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to register service {service.id}: {e}")
+            return False
 
-    def consul_unregister_service(self, service):
+    def consul_unregister_service(self, service: Service | str) -> None:
         if isinstance(service, Service):
             log.info(f"UNREGISTER SERVICE {service}")
             service_id = service.id
@@ -467,45 +475,45 @@ class ServiceRegistrator:
             service_id = service
             log.info(f"UNREGISTER SERVICE with id {service_id}")
         try:
-            self.consul_client.agent.service.deregister(service_id)
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
+            self.consul_client.agent_service_deregister(service_id)
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to deregister service {service_id}: {e}")
 
-    def register_services(self, container_info):
+    def register_services(self, container_info: ContainerInfo) -> bool:
+        """Register all services for a container. Returns True if all succeeded."""
+        all_ok = True
         for service in container_info.services:
-            self.consul_register_service(service)
+            if not self.consul_register_service(service):
+                all_ok = False
+        return all_ok
 
-    def unregister_services(self, container_info):
+    def unregister_services(self, container_info: ContainerInfo) -> None:
         for service in container_info.services:
             self.consul_unregister_service(service)
 
-    def register_container(self, container_info):
-        if container_info.health is not None and container_info.health != 'healthy':
+    def register_container(self, container_info: ContainerInfo) -> None:
+        if container_info.health is not None and container_info.health != "healthy":
             log.info(f"SKIPPED CONTAINER (unhealthy): {container_info}")
             return
-        log.info(f'REGISTER CONTAINER {container_info}')
+        log.info(f"REGISTER CONTAINER {container_info}")
         log.debug(repr(container_info))
-        self.containers[container_info.cid] = container_info
-        self.register_services(container_info)
+        if self.register_services(container_info):
+            self.containers[container_info.cid] = container_info
+        else:
+            log.warning(f"Some services failed to register for {container_info}, will retry on next sync")
 
-    def unregister_container(self, container_info):
+    def unregister_container(self, container_info: ContainerInfo) -> None:
         if container_info.cid in self.containers:
-            log.info(f'UNREGISTER CONTAINER {container_info}')
+            log.info(f"UNREGISTER CONTAINER {container_info}")
             log.debug(repr(container_info))
-            try:
-                self.unregister_services(container_info)
-            except Exception as e:
-                raise e
-            else:
-                del self.containers[container_info.cid]
-                log.debug(f'container {container_info} removed')
+            self.unregister_services(container_info)
+            del self.containers[container_info.cid]
+            log.debug(f"container {container_info} removed")
         else:
             log.debug(f"no registered container {container_info}")
 
-    def is_our_identifier(self, serviceid, prefix=''):
-        identifier = serviceid.split(':')
+    def is_our_identifier(self, serviceid: str, prefix: str = "") -> tuple[bool, str | None]:
+        identifier = serviceid.split(":")
         length = len(identifier)
         if prefix:
             if identifier[0] != prefix:
@@ -515,36 +523,34 @@ class ServiceRegistrator:
                 length -= 1
         if length < 3:
             return False, "length < 3"
+        # Strip known suffixes: :udp, :alias
+        while length > 3 and identifier[-1] in ("udp", "alias"):
+            identifier = identifier[:-1]
+            length -= 1
         if length > 3:
-            if identifier[-1] != 'udp':
-                return False, "no udp"
-            else:
-                identifier = identifier[:-1]
-                length -= 1
+            return False, "unexpected suffix"
         if identifier[0] != self.hostname:
             return False, "different hostname"
         return True, None
 
-    def containers_service_identifiers(self):
+    def containers_service_identifiers(self) -> set[str]:
         services = set()
         for container_info in self.containers.values():
             services.update(container_info.service_identifiers())
         return services
 
-    def consul_services(self):
+    def consul_services(self) -> dict[str, Any]:
         try:
-            return self.consul_client.agent.services()
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
+            return self.consul_client.agent_services()
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to list consul services: {e}")
             return {}
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         log.info("services cleanup")
         registered_services = self.consul_services()
         our_services = self.containers_service_identifiers()
-        prefix = self.context.options['service_prefix']
+        prefix = self.context.options["service_prefix"]
         for serviceid in registered_services:
             is_ours, comment = self.is_our_identifier(serviceid, prefix)
             if not is_ours:

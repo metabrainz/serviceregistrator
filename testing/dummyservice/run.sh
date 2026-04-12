@@ -103,3 +103,18 @@ docker run -d \
 	--name "$NAME" \
 	--publish "${EXTPORT}:${INTPORT}" \
 	dummyservice
+
+
+NAME="dummyservice_alias"
+INTPORT=80
+EXTPORT=8089
+docker rm -f "$NAME"
+docker run -d \
+	--env "SERVICE_${INTPORT}_NAME=haproxy-postgres-primary" \
+	--env "SERVICE_${INTPORT}_ALIAS=postgres-master" \
+	--env "SERVICE_${INTPORT}_CHECK_TCP=true" \
+	--env "SERVICE_${INTPORT}_CHECK_INTERVAL=10s" \
+	--hostname "$HOSTNAME" \
+	--name "$NAME" \
+	--publish "${EXTPORT}:${INTPORT}" \
+	dummyservice

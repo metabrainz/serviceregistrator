@@ -1,37 +1,47 @@
-[tool.poetry]
+[project]
 name = "serviceregistrator"
-version = "0.5.3"
+version = "0.6.0"
 description = "Bridge betwen docker and consul services, inspired by registrator"
-authors = ["Laurent Monin <zas@metabrainz.org>"]
-license = "GPL-3.0-or-later"
+authors = [{name = "Laurent Monin", email = "zas@metabrainz.org"}]
+license = {text = "GPL-3.0-or-later"}
 readme = "README.md"
-repository = "https://github.com/metabrainz/serviceregistrator"
-
+requires-python = ">=3.10"
 keywords = ["consul", "docker", "service registration"]
-
 classifiers = [
-    "Topic :: Software Development :: Libraries :: Python Modules"
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "click>=7.1.2",
+    "docker>=4.4.1",
+    "requests>=2.20.0",
+    "urllib3>=1.26.0",
 ]
 
-
-[tool.poetry.dependencies]
-python = "^3.8"
-click = ">=7.1.2"
-docker = ">=4.4.1"
-python-consul2 = ">=0.1.5"
-requests = "<2.29.0"
-urllib3 = "<2.0"
-
-[tool.poetry.dev-dependencies]
-flake8 = "^3.8.4"
-pytest = "^6.2.2"
-wheel = "^0.36.2"
-pytest-cov = "^2.11.1"
-pylint = "^2.6.0"
-
-[tool.poetry.scripts]
+[project.scripts]
 serviceregistrator = "serviceregistrator.main:main"
 
+[project.urls]
+Repository = "https://github.com/metabrainz/serviceregistrator"
+
+[dependency-groups]
+dev = [
+    "pytest>=6.2.2",
+    "pytest-cov>=2.11.1",
+    "ruff>=0.11",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: require Docker and Consul (deselected by default)",
+]
+
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

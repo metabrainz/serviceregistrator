@@ -3,22 +3,53 @@
 An alternative to https://github.com/gliderlabs/registrator
 
 
-## Install poetry
+## Install uv
 
-https://python-poetry.org/docs/#installation
+https://docs.astral.sh/uv/getting-started/installation/
 
 ## Dev env
 
 ```bash
-poetry shell
+uv sync
 ```
 
 ```bash
-poetry install
+uv run serviceregistrator --help
 ```
 
+## Tests
+
+Unit tests:
+
 ```bash
-serviceregistrator --help
+uv run pytest tests/
+```
+
+Integration tests (require Docker and pull a Consul image):
+
+```bash
+uv run pytest -m integration -v
+```
+
+All tests:
+
+```bash
+uv run pytest -m '' -v
+```
+
+Lint, format, and type checks:
+
+```bash
+uv run ruff check serviceregistrator tests
+uv run ruff format --check serviceregistrator tests
+uvx ty@0.0.29 check serviceregistrator
+```
+
+Manual end-to-end testing (see `testing/README.md`):
+
+```bash
+cd testing/dummyservice
+./run_all.sh
 ```
 
 ## Running in a docker container
@@ -39,7 +70,7 @@ docker run --rm serviceregistrator --help
 ## References
 
 - https://docker-py.readthedocs.io/en/stable/
-- https://python-consul2.readthedocs.io/en/latest/
+- https://developer.hashicorp.com/consul/api-docs
 
 
 # Usage
@@ -87,10 +118,10 @@ object into a particular registry.
 
 ### Container Overrides
 
-The fields `Name`, `Tags`, `Attrs`, and `ID` can be overridden by user-defined
-container metadata. You can use environment variables or labels prefixed with
-`SERVICE_` or `SERVICE_<port>_` to set values, where `<port>` is the **internal**
-exposed port number.
+The fields `Name`, `Tags`, `Attrs`, `ID`, and `Alias` can be overridden by
+user-defined container metadata. You can use environment variables or labels
+prefixed with `SERVICE_` or `SERVICE_<port>_` to set values, where `<port>` is
+the **internal** exposed port number.
 For example `SERVICE_NAME=customerdb` and `SERVICE_80_NAME=api`.
 
 You use a port in the key name to refer to a particular service on that port.
@@ -127,6 +158,36 @@ It can be overridden by `SERVICE_IP` or `SERVICE_<port>_IP`
 Tags and attributes are extra metadata fields for services.
 
 Attributes can also be used for specifying Consul health checks.
+
+
+### Service Alias
+
+You can register a service under an additional name using `SERVICE_ALIAS` or
+`SERVICE_<port>_ALIAS`. This creates a second service in Consul with a
+[Consul alias health check](https://developer.hashicorp.com/consul/api-docs/agent/check#aliasservice)
+that mirrors the health of the original service.
+
+This is useful for renaming services without breaking existing consul template
+files. For example:
+
+```bash
+docker run -d \
+  --env "SERVICE_80_NAME=haproxy-postgres-primary" \
+  --env "SERVICE_80_ALIAS=postgres-master" \
+  --publish "5432:80" \
+  myimage
+```
+
+This registers two services in Consul:
+
+  - `haproxy-postgres-primary` — the real service with its normal health check
+  - `postgres-master` — an alias that mirrors the health of `haproxy-postgres-primary`
+
+Existing consul template files using `{{if service "postgres-master"}}` will
+continue to work while you migrate to the new naming convention.
+
+The alias service inherits the same IP, port, and tags as the original service.
+Its service ID has an `:alias` suffix appended.
 
 
 ### Unique ID

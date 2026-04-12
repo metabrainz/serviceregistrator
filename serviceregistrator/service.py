@@ -21,27 +21,32 @@
 
 
 class Service:
-
-    def __init__(self, container_id, id_, name, ip, port, tags=None, attrs=None):
-        #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
-        self.id = id_      # string               // unique service instance ID
-        self.name = name   # string               // service name
-        self.ip = ip       # string               // IP address service is located at
-        self.port = port   # int                  // port service is listening on
-        # []string             // extra tags to classify service
-        self.tags = tags if not None else []
-        #  map[string]string    // extra attribute metadata
-        self.attrs = attrs if not None else dict()
+    def __init__(
+        self,
+        container_id: str,
+        id_: str,
+        name: str,
+        ip: str,
+        port: int,
+        tags: list[str] | None = None,
+        attrs: dict[str, str] | None = None,
+        alias_of: str | None = None,
+    ) -> None:
+        self.id = id_
+        self.name = name
+        self.ip = ip
+        self.port = port
+        self.tags = tags if tags is not None else []
+        self.attrs = attrs if attrs is not None else dict()
         self.container_id = container_id
+        self.alias_of = alias_of
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
-            f'<{self.__class__.__name__}: {self.id} '
-            f'(name:{self.name} ip:{self.ip} port:{self.port} tags:{self.tags}>'
+            f"<{self.__class__.__name__}: {self.id} (name:{self.name} ip:{self.ip} port:{self.port} tags:{self.tags}>"
         )
 
-    def __repr__(self):
-        return ("{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', "
-                "{s.port}, tags={s.tags}, attrs={s.attrs})").format(
-            t=type(self).__name__,
-            s=self)
+    def __repr__(self) -> str:
+        return (
+            "{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', {s.port}, tags={s.tags}, attrs={s.attrs})"
+        ).format(t=type(self).__name__, s=self)

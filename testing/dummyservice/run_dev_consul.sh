@@ -6,7 +6,7 @@ else
 	CONSUL_IMAGE_VERSION=latest
 fi
 
-IMAGE=library/consul:$CONSUL_IMAGE_VERSION
+IMAGE=hashicorp/consul:$CONSUL_IMAGE_VERSION
 
 docker rm -f dev-consul
 
