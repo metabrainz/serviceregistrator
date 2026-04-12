@@ -25,13 +25,12 @@ import logging
 from serviceregistrator.service import Service
 
 
-log = logging.getLogger('serviceregistrator')
+log = logging.getLogger("serviceregistrator")
 
 
 class ContainerInfo:
-
-    SERVICE_PREFIX_NAME_SEPARATOR = '-'
-    SERVICE_ID_SEPARATOR = ':'
+    SERVICE_PREFIX_NAME_SEPARATOR = "-"
+    SERVICE_ID_SEPARATOR = ":"
 
     def __init__(self, cid, name, ports, metadata, metadata_with_port, hostname, serviceip, tags):
         self.cid = cid
@@ -54,7 +53,8 @@ class ContainerInfo:
     def __repr__(self):
         return (
             "{t}('{s.cid}', '{s.name}', {s.ports}, {s.metadata}, {s.metadata_with_port}, "
-            "'{s.hostname}', '{s.serviceip}', {s.tags})").format(t=type(self).__name__, s=self)
+            "'{s.hostname}', '{s.serviceip}', {s.tags})"
+        ).format(t=type(self).__name__, s=self)
 
     def __bool__(self):
         return bool(self.metadata or self.metadata_with_port)
@@ -68,7 +68,7 @@ class ContainerInfo:
             return None
 
     def get_name(self, port):
-        name = self.get_attr('name', port.internal)
+        name = self.get_attr("name", port.internal)
         if name and self.service_prefix:
             return self.service_prefix + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
@@ -90,35 +90,35 @@ class ContainerInfo:
         if count < 1:
             return None
         elif count > 1:
-            name = f'{name}-{port.external}'
-            if port.protocol != 'tcp':
-                name = f'{name}-{port.protocol}'
+            name = f"{name}-{port.external}"
+            if port.protocol != "tcp":
+                name = f"{name}-{port.protocol}"
         return name
 
     def build_service_tags(self, port):
-        tags = self.get_attr('tags', port.internal) or []
+        tags = self.get_attr("tags", port.internal) or []
         if self.tags:
             tags.extend(self.tags)
-        if port.protocol != 'tcp':
+        if port.protocol != "tcp":
             tags.append(port.protocol)
         return [x for x in set(tags) if x]
 
     def build_service_attrs(self, port):
-        return self.get_attr('attrs', port.internal) or {}
+        return self.get_attr("attrs", port.internal) or {}
 
     def build_service_id(self, port):
         parts = []
         if self.service_prefix:
             parts.append(self.service_prefix)
         parts.extend([self.hostname, self.name, str(port.external)])
-        if port.protocol != 'tcp':
+        if port.protocol != "tcp":
             parts.append(str(port.protocol))
         return self.SERVICE_ID_SEPARATOR.join(parts)
 
     def build_service_ip(self, port):
-        ip = self.get_attr('ip', port.internal)
+        ip = self.get_attr("ip", port.internal)
         if ip is None:
-            if port.ip not in {'0.0.0.0', '::', ''}:
+            if port.ip not in {"0.0.0.0", "::", ""}:
                 return port.ip
             else:
                 return self.serviceip
@@ -147,7 +147,7 @@ class ContainerInfo:
                     self.build_service_ip(port),
                     port.external,
                     tags=self.build_service_tags(port),
-                    attrs=self.build_service_attrs(port)
+                    attrs=self.build_service_attrs(port),
                 )
             self._services = list(services.values())
         return self._services

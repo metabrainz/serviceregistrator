@@ -40,11 +40,11 @@ jobs:
       - name: Test with pytest
         run: |
           uv run python -m pytest -v --cov=serviceregistrator tests/
-      - name: Lint with flake8
+      - name: Lint with ruff
         run: |
-          uv run flake8 --show-source --statistics --count
-      - name: Lint with pylint
+          uv run ruff check serviceregistrator tests
+      - name: Check formatting with ruff
         run: |
-          uv run pylint -j0 --exit-zero serviceregistrator
+          uv run ruff format --check serviceregistrator tests
 
 # vim: set shiftwidth=2 tabstop=2 softtabstop=-1 expandtab:

@@ -21,13 +21,12 @@
 
 
 class Service:
-
     def __init__(self, container_id, id_, name, ip, port, tags=None, attrs=None):
         #  https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/services.md#service-object
-        self.id = id_      # string               // unique service instance ID
-        self.name = name   # string               // service name
-        self.ip = ip       # string               // IP address service is located at
-        self.port = port   # int                  // port service is listening on
+        self.id = id_  # string               // unique service instance ID
+        self.name = name  # string               // service name
+        self.ip = ip  # string               // IP address service is located at
+        self.port = port  # int                  // port service is listening on
         # []string             // extra tags to classify service
         self.tags = tags if not None else []
         #  map[string]string    // extra attribute metadata
@@ -36,12 +35,10 @@ class Service:
 
     def __str__(self):
         return (
-            f'<{self.__class__.__name__}: {self.id} '
-            f'(name:{self.name} ip:{self.ip} port:{self.port} tags:{self.tags}>'
+            f"<{self.__class__.__name__}: {self.id} (name:{self.name} ip:{self.ip} port:{self.port} tags:{self.tags}>"
         )
 
     def __repr__(self):
-        return ("{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', "
-                "{s.port}, tags={s.tags}, attrs={s.attrs})").format(
-            t=type(self).__name__,
-            s=self)
+        return (
+            "{t}('{s.container_id}', '{s.id}', '{s.name}', '{s.ip}', {s.port}, tags={s.tags}, attrs={s.attrs})"
+        ).format(t=type(self).__name__, s=self)

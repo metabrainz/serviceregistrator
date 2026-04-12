@@ -25,29 +25,29 @@ import signal
 import sys
 
 
-log = logging.getLogger('serviceregistrator')
+log = logging.getLogger("serviceregistrator")
 
 
 class ContainerMetadata(UserDict):
     def __setitem__(self, key, value):
         # all keys are lowered
         key = key.lower()
-        if key in ('tags', ):
+        if key in ("tags",):
             # handle lists merging
             if value is None:
                 value = []
             elif not isinstance(value, list):
-                value = list(set(value.split(',')))
+                value = list(set(value.split(",")))
             if key in self:
                 # uniqify
                 super().__setitem__(key, [x for x in set(self[key] + value) if x])
             else:
                 super().__setitem__(key, value)
 
-        elif key in ('name', 'id', 'ip'):
+        elif key in ("name", "id", "ip"):
             # those keys are added as is
             super().__setitem__(key, value)
-        elif key in ('attrs', ):
+        elif key in ("attrs",):
             # handle dict merging
             if key in self:
                 self[key].update(value)
@@ -55,9 +55,9 @@ class ContainerMetadata(UserDict):
                 super().__setitem__(key, value)
         else:
             # all other keys are added as attributes
-            if 'attrs' not in self:
-                super().__setitem__('attrs', dict())
-            self['attrs'][key] = value
+            if "attrs" not in self:
+                super().__setitem__("attrs", dict())
+            self["attrs"][key] = value
 
     def __repr__(self):
         return f"{type(self).__name__}({self.data})"
@@ -84,7 +84,7 @@ class Context:
         # those signals force a resynchronisation
         signal.signal(signal.SIGHUP, self.sync_with_containers)
         signal.signal(signal.SIGALRM, self.sync_with_containers)
-        resync = float(self.options['resync'])
+        resync = float(self.options["resync"])
         if resync > 0.0:
             log.info(f"Resync every {resync} seconds")
             signal.setitimer(signal.ITIMER_REAL, resync, resync)
@@ -119,7 +119,7 @@ class Context:
     def configure_logging(self, options):
         console_handler = logging.StreamHandler(sys.stderr)
         handlers = [console_handler]
-        logfile = self.options['logfile']
+        logfile = self.options["logfile"]
         if logfile:
             try:
                 filehandler = logging.FileHandler(filename=logfile)
@@ -129,10 +129,10 @@ class Context:
 
         logging.basicConfig(
             level=logging.ERROR,
-            format='[%(asctime)s] {%(module)s:%(lineno)d} %(levelname)s - %(message)s',
-            handlers=handlers
+            format="[%(asctime)s] {%(module)s:%(lineno)d} %(levelname)s - %(message)s",
+            handlers=handlers,
         )
         try:
-            log.setLevel(options['loglevel'])
+            log.setLevel(options["loglevel"])
         except ValueError as e:
             log.error(e)

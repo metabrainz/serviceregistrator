@@ -25,27 +25,27 @@ import logging
 import shlex
 
 
-log = logging.getLogger('serviceregistrator')
+log = logging.getLogger("serviceregistrator")
 
 
 class ServiceCheck:
     defaults = {
-        'body': None,
-        'deregister': None,
-        'docker': None,
-        'header': None,
-        'http': '',
-        'https': '',
-        'http_method': None,
-        'https_method': None,
-        'initial_status': None,
-        'interval': '10s',
-        'shell': '/bin/sh',
-        'script': None,
-        'tcp': None,
-        'timeout': None,
-        'tls_skip_verify': None,
-        'ttl': None,
+        "body": None,
+        "deregister": None,
+        "docker": None,
+        "header": None,
+        "http": "",
+        "https": "",
+        "http_method": None,
+        "https_method": None,
+        "initial_status": None,
+        "interval": "10s",
+        "shell": "/bin/sh",
+        "script": None,
+        "tcp": None,
+        "timeout": None,
+        "tls_skip_verify": None,
+        "ttl": None,
     }
 
     consul_version = (0, 0, 0)
@@ -56,8 +56,8 @@ class ServiceCheck:
 
     @classmethod
     def _common_values(cls, params):
-        interval = cls._value(params, 'interval')
-        deregister = cls._value(params, 'deregister')
+        interval = cls._value(params, "interval")
+        deregister = cls._value(params, "deregister")
         return interval, deregister
 
     @classmethod
@@ -73,19 +73,19 @@ class ServiceCheck:
     @classmethod
     def _bool_value(cls, params, key):
         value = cls._value(params, key)
-        return value and value.lower() == 'true'
+        return value and value.lower() == "true"
 
     @classmethod
     def _post_process(cls, checkret, params):
         # https://www.consul.io/api-docs/agent/check#status
         # https://github.com/gliderlabs/registrator/blob/4322fe00304d6de661865721b073dc5c7e750bd2/docs/user/backends.md#consul-initial-health-check-status
-        initial_status = cls._value(params, 'initial_status')
+        initial_status = cls._value(params, "initial_status")
         if initial_status:
-            checkret['Status'] = initial_status
+            checkret["Status"] = initial_status
         return checkret
 
     @classmethod
-    def _http(cls, service, params, proto='http'):
+    def _http(cls, service, params, proto="http"):
         """
         Consul HTTP Check
 
@@ -124,13 +124,14 @@ class ServiceCheck:
             # paramater is in form of map of lists of strings,
             # e.g. {"x-foo": ["bar", "baz"]}.
             url = f"{proto}://{service.ip}:{service.port}{path}"
-            timeout = cls._value(params, 'timeout')
+            timeout = cls._value(params, "timeout")
             interval, deregister = cls._common_values(params)
-            tls_skip_verify = cls._bool_value(params, 'tls_skip_verify')
-            header = cls._json_value(params, 'header')
-            ret = Check.http(url, interval, timeout=timeout, deregister=deregister,
-                             header=header, tls_skip_verify=tls_skip_verify)
-            method = cls._value(params, proto + '_method')
+            tls_skip_verify = cls._bool_value(params, "tls_skip_verify")
+            header = cls._json_value(params, "header")
+            ret = Check.http(
+                url, interval, timeout=timeout, deregister=deregister, header=header, tls_skip_verify=tls_skip_verify
+            )
+            method = cls._value(params, proto + "_method")
             if method:
                 if cls.consul_version <= (0, 8, 5):
                     # method was buggy before that
@@ -138,8 +139,8 @@ class ServiceCheck:
                     return None
                 # FIXME: as 2021/01/20, python-consul doesn't support setting method
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#084-june-9-2017
-                ret['Method'] = method.upper()
-            body = cls._value(params, 'body')
+                ret["Method"] = method.upper()
+            body = cls._value(params, "body")
             if body:
                 if cls.consul_version < (1, 7, 0):
                     # not implemented before 1.7.0
@@ -147,17 +148,17 @@ class ServiceCheck:
                 # consul >= 1.7.0
                 # https://github.com/hashicorp/consul/pull/6602
                 # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#170-february-11-2020
-                ret['Body'] = body
+                ret["Body"] = body
             return cls._post_process(ret, params)
         return None
 
     @classmethod
     def http(cls, service, params):
-        return cls._http(service, params, proto='http')
+        return cls._http(service, params, proto="http")
 
     @classmethod
     def https(cls, service, params):
-        return cls._http(service, params, proto='https')
+        return cls._http(service, params, proto="https")
 
     @classmethod
     def tcp(cls, service, params):
@@ -174,7 +175,7 @@ class ServiceCheck:
         """
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L85
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-tcp-check
-        tcp = cls._bool_value(params, 'tcp')
+        tcp = cls._bool_value(params, "tcp")
         if tcp:
             # Attempt to establish a tcp connection to the specified *host* and
             # *port* at a specified *interval* with optional *timeout* and optional
@@ -183,7 +184,7 @@ class ServiceCheck:
             host = service.ip
             port = service.port
             interval, deregister = cls._common_values(params)
-            timeout = cls._value(params, 'timeout')
+            timeout = cls._value(params, "timeout")
             ret = Check.tcp(host, port, interval, timeout=timeout, deregister=deregister)
             return cls._post_process(ret, params)
         return None
@@ -201,7 +202,7 @@ class ServiceCheck:
         """
         # https://github.com/cablehead/python-consul/blob/53eb41c4760b983aec878ef73e72c11e0af501bb/consul/base.py#L103
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-ttl-check
-        ttl = cls._value(params, 'ttl')
+        ttl = cls._value(params, "ttl")
         if ttl:
             # Set check to be marked as critical after *ttl* (e.g. "10s") unless the
             # check
@@ -230,11 +231,11 @@ class ServiceCheck:
         # https://github.com/gliderlabs/registrator/blob/master/docs/user/backends.md#consul-script-check
         # https://www.consul.io/docs/agent/options#_enable_script_checks
         # https://www.hashicorp.com/blog/protecting-consul-from-rce-risk-in-specific-configurations
-        args = cls._value(params, 'script')
+        args = cls._value(params, "script")
         if args:
             # Run the script *args* every *interval* (e.g. "10s") to perfom health check
-            args = args.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
-            interval = cls._value(params, 'interval')
+            args = args.replace("$SERVICE_IP", service.ip).replace("$SERVICE_PORT", str(service.port))
+            interval = cls._value(params, "interval")
             if cls.consul_version >= (1, 1, 0):
                 ret = Check.script(shlex.split(args), interval)
                 return cls._post_process(ret, params)
@@ -243,8 +244,8 @@ class ServiceCheck:
                 # https://github.com/cablehead/python-consul/commit/f405dee1beb6019986307c121702d2e9ad40bcda
                 # https://github.com/cablehead/python-consul/commit/e3493a0e6089d01ae37347f452cf7510813e2eb4
                 ret = Check.script(args, interval)
-                ret['script'] = args
-                del ret['args']
+                ret["script"] = args
+                del ret["args"]
                 return cls._post_process(ret, params)
         return None
 
@@ -259,22 +260,22 @@ class ServiceCheck:
         # https://www.consul.io/docs/discovery/checks#docker-interval
         #
         # NOTE: consul agent should be able to access docker socket: -v /var/run/docker.sock:/var/run/docker.sock
-        script = cls._value(params, 'docker')
+        script = cls._value(params, "docker")
         if script:
             # Invoke *script* packaged within a running docker container with
             # *container_id* at a specified *interval* on the configured
             # *shell* using the Docker Exec API.  Optional *register* after which a
             # failing service will be automatically deregistered.
-            script = script.replace('$SERVICE_IP', service.ip).replace('$SERVICE_PORT', str(service.port))
+            script = script.replace("$SERVICE_IP", service.ip).replace("$SERVICE_PORT", str(service.port))
             container_id = service.container_id[:12]
-            shell = cls._value(params, 'shell')
+            shell = cls._value(params, "shell")
             interval, deregister = cls._common_values(params)
             ret = Check.docker(container_id, shell, script, interval, deregister=deregister)
             # FIXME: as 2021/01/24, python-consul2 uses old script instead of args
             # it was removed in consul 1.1.0
             # https://github.com/hashicorp/consul/blob/master/CHANGELOG.md#110-may-11-2018
             if cls.consul_version >= (1, 1, 0):
-                ret['args'] = shlex.split(script)
-                del ret['script']
+                ret["args"] = shlex.split(script)
+                del ret["script"]
             return cls._post_process(ret, params)
         return None
