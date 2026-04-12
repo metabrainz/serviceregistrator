@@ -4,7 +4,7 @@ docker build -t $IMAGE -f Dockerfile.unhealthy .
 
 NAME="dummyservice_unhealthy"
 INTPORT=80
-EXTPORT=8087
+EXTPORT=8088
 docker rm -f "$NAME"
 docker run -d \
 	--env "SERVICE_${INTPORT}_NAME=$NAME" \
