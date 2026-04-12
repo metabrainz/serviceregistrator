@@ -108,7 +108,7 @@ class ContainerInfo:
         return name
 
     def build_service_tags(self, port: Any) -> list[str]:
-        tags = self.get_attr("tags", port.internal) or []
+        tags = list(self.get_attr("tags", port.internal) or [])
         if self.tags:
             tags.extend(self.tags)
         if port.protocol != "tcp":
