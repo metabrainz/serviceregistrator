@@ -1,7 +1,41 @@
 # serviceregistrator
 
-An alternative to https://github.com/gliderlabs/registrator
+A lightweight service registry bridge between Docker and [Consul](https://www.consul.io/).
 
+ServiceRegistrator automatically registers and deregisters services in Consul
+as Docker containers start and stop. It monitors the Docker event stream in
+real-time and keeps Consul's service catalog in sync with the running
+containers on a host.
+
+## Why ServiceRegistrator?
+
+This project is a Python re-implementation of
+[Gliderlabs Registrator](https://github.com/gliderlabs/registrator), which is
+no longer actively maintained. It is partly compatible with Registrator's
+`SERVICE_*` environment variable syntax, making migration straightforward.
+
+Key differences from Gliderlabs Registrator:
+
+- **Explicit registration only**: containers must define a `SERVICE_NAME` (or
+  `SERVICE_<port>_NAME`) to be registered. Unnamed services are skipped, giving
+  you full control over what appears in Consul.
+- **Written in Python**: easier to extend, debug, and contribute to.
+- **Service aliases**: register a service under an additional name with an alias
+  health check, useful for renaming services without breaking existing Consul
+  templates.
+- **Periodic resync**: optionally re-synchronize all services on a timer to
+  recover from transient Consul issues.
+
+## Use Cases
+
+- **Dynamic service discovery**: automatically populate Consul's catalog so that
+  load balancers, proxies, and other consumers can discover services by name.
+- **Health-aware routing**: leverage Docker and Consul health checks so that
+  only healthy containers receive traffic.
+- **Zero-touch service lifecycle**: no manual Consul API calls needed — just
+  start or stop containers and the catalog updates itself.
+- **Gradual service renaming**: use aliases to introduce new service names while
+  keeping the old ones working during a migration period.
 
 ## Install uv
 
@@ -66,7 +100,6 @@ docker build . -t serviceregistrator
 docker run --rm serviceregistrator --help
 ```
 
-
 ## References
 
 - https://docker-py.readthedocs.io/en/stable/
@@ -105,60 +138,87 @@ Options:
   --help                          Show this message and exit.
 ```
 
-## Service Object
+## Configuring Services
 
-ServiceRegistrator is primarily concerned with services that would be added to a
-service discovery registry. In our case, a service is anything listening on a
-port. If a container listens on multiple ports, it has multiple services.
+ServiceRegistrator discovers services by reading `SERVICE_*` environment
+variables and Docker labels on each container. These variables control what gets
+registered in Consul and how.
 
-Services are created with information from the container, including user-defined
-metadata on the container, into an intermediary service object. This service
-object is then passed to a registry backend to try and place as much of this
-object into a particular registry.
+### How It Works
 
-### Container Overrides
+1. A container must have **explicitly published ports** (`-p` or `-P`).
+   For containers in host network mode, **exposed ports** (`EXPOSE`) are used.
+2. A container must define a **`SERVICE_NAME`** (or `SERVICE_<port>_NAME` for a
+   specific port). Containers without a name are skipped — nothing is registered.
+3. ServiceRegistrator reads all `SERVICE_*` environment variables and labels,
+   builds a service object for each named port, and registers it in Consul.
 
-The fields `Name`, `Tags`, `Attrs`, `ID`, and `Alias` can be overridden by
-user-defined container metadata. You can use environment variables or labels
-prefixed with `SERVICE_` or `SERVICE_<port>_` to set values, where `<port>` is
-the **internal** exposed port number.
-For example `SERVICE_NAME=customerdb` and `SERVICE_80_NAME=api`.
+### `SERVICE_*` Variables
 
-You use a port in the key name to refer to a particular service on that port.
-Metadata variables without a port in the name are used as the default for all
-services or can be used to conveniently refer to the single exposed service.
+You can set these as either **environment variables** (`--env`) or **Docker
+labels** (`--label`). Environment variables take precedence over labels when
+both are set.
 
-The `Attrs` field is populated by metadata using any other field names in the
-key name. For example, `SERVICE_REGION=us-east`.
+There are two forms:
 
-Since metadata is stored as environment variables or labels, the container
-author can include their own metadata defined in the Dockerfile. The operator
-will still be able to override these author-defined defaults.
+- **`SERVICE_<KEY>=<value>`** — applies to all ports on the container (or the
+  single exposed port).
+- **`SERVICE_<port>_<KEY>=<value>`** — applies only to the service on that
+  **internal** (container) port. Port-specific values override the generic ones.
 
+The recognized keys are:
 
-### Detecting Services
+| Key     | Description                                              | Example                                |
+|---------|----------------------------------------------------------|----------------------------------------|
+| `NAME`  | **(Required)** Service name registered in Consul         | `SERVICE_NAME=postgres`                |
+| `IP`    | Override the service IP address                          | `SERVICE_IP=10.0.0.5`                  |
+| `TAGS`  | Comma-separated list of Consul tags                      | `SERVICE_TAGS=primary,db`              |
+| `ALIAS` | Register an additional service name (see [Service Alias](#service-alias)) | `SERVICE_ALIAS=pg-master` |
 
-ServiceRegistrator will only pick up services from containers that
-have *explicitly published ports* (eg, using `-p` or `-P`).
-For containers running in host network mode, it will pick *exposed ports*.
+Any other key is stored as a **service attribute** (key-value metadata):
 
-**IMPORTANT**:
-If no `SERVICE_NAME` or matching `SERVICE_<port>_NAME` can be found, service
-will be skipped.
-That's a main difference with registrator which registers everything it finds.
+```bash
+SERVICE_REGION=us-east        # sets attr "region" = "us-east"
+SERVICE_80_WEIGHT=10          # sets attr "weight" = "10" on port 80
+```
 
-### IP
+Attributes are also used to configure [Consul health checks](#health-checks).
 
-`-i/--ip` option is mandatory.
+Container authors can set defaults in their Dockerfile; operators can override
+them at `docker run` time.
 
-It can be overridden by `SERVICE_IP` or `SERVICE_<port>_IP`
+### Example
 
-### Tags and Attributes
+```bash
+docker run -d \
+  --env "SERVICE_NAME=myapi" \
+  --env "SERVICE_TAGS=web,public" \
+  --env "SERVICE_80_CHECK_HTTP=/healthz" \
+  --env "SERVICE_80_CHECK_INTERVAL=15s" \
+  --publish "8080:80" \
+  myimage
+```
 
-Tags and attributes are extra metadata fields for services.
+This registers a service named `myapi` in Consul at the host's IP on port 8080,
+with tags `web` and `public`, and an HTTP health check hitting `/healthz` every
+15 seconds.
 
-Attributes can also be used for specifying Consul health checks.
+For a multi-port container, use port-specific names:
 
+```bash
+docker run -d \
+  --env "SERVICE_80_NAME=myapi" \
+  --env "SERVICE_443_NAME=myapi-ssl" \
+  --publish "8080:80" \
+  --publish "8443:443" \
+  myimage
+```
+
+### Service IP
+
+The `--ip` command-line flag sets the default IP for all services. It can be
+overridden per-container with `SERVICE_IP` or per-port with
+`SERVICE_<port>_IP`.
 
 ### Service Alias
 
@@ -167,7 +227,7 @@ You can register a service under an additional name using `SERVICE_ALIAS` or
 [Consul alias health check](https://developer.hashicorp.com/consul/api-docs/agent/check#aliasservice)
 that mirrors the health of the original service.
 
-This is useful for renaming services without breaking existing consul template
+This is useful for renaming services without breaking existing Consul template
 files. For example:
 
 ```bash
@@ -183,24 +243,72 @@ This registers two services in Consul:
   - `haproxy-postgres-primary` — the real service with its normal health check
   - `postgres-master` — an alias that mirrors the health of `haproxy-postgres-primary`
 
-Existing consul template files using `{{if service "postgres-master"}}` will
+Existing Consul template files using `{{if service "postgres-master"}}` will
 continue to work while you migrate to the new naming convention.
 
 The alias service inherits the same IP, port, and tags as the original service.
 Its service ID has an `:alias` suffix appended.
 
+### Health Checks
 
-### Unique ID
+Health checks are configured through service attributes (the `SERVICE_*`
+variables with check-related keys). The following check types are supported:
 
-The ID is a cluster-wide unique identifier for this service instance. For the
-most part, it's an implementation detail, as users typically use service names,
-not their IDs. ServiceRegistrator comes up with a human-friendly string that
-encodes useful information in the ID based on this pattern:
+**HTTP / HTTPS check:**
 
-	<hostname>:<container-name>:<exposed-port>[:udp if udp]
+```bash
+SERVICE_80_CHECK_HTTP=/health        # path to check
+SERVICE_80_CHECK_INTERVAL=15s        # check interval (default: 10s)
+SERVICE_80_CHECK_TIMEOUT=2s          # request timeout
+SERVICE_443_CHECK_HTTPS=/health      # same for HTTPS
+SERVICE_443_CHECK_TLS_SKIP_VERIFY=true
+```
+
+**TCP check:**
+
+```bash
+SERVICE_5432_CHECK_TCP=true
+SERVICE_5432_CHECK_INTERVAL=10s
+SERVICE_5432_CHECK_TIMEOUT=3s
+```
+
+**TTL check:**
+
+```bash
+SERVICE_CHECK_TTL=30s
+```
+
+**Script check:**
+
+```bash
+SERVICE_CHECK_SCRIPT=curl --silent --fail http://$SERVICE_IP:$SERVICE_PORT/health
+```
+
+**Docker check:**
+
+```bash
+SERVICE_CHECK_DOCKER=curl --silent --fail http://localhost/health
+```
+
+Common check options:
+
+| Key                    | Description                                          |
+|------------------------|------------------------------------------------------|
+| `CHECK_INTERVAL`       | Time between checks (default: `10s`)                 |
+| `CHECK_TIMEOUT`        | Check timeout                                        |
+| `CHECK_DEREGISTER`     | Deregister after being critical for this duration     |
+| `CHECK_INITIAL_STATUS` | Initial check status (`passing`, `warning`, `critical`) |
+
+### Service ID
+
+The service ID is a cluster-wide unique identifier generated automatically:
+
+    <hostname>:<container-name>:<exposed-port>[:udp if udp]
+
+This is mostly an implementation detail — you typically use service names, not
+IDs.
 
 ### Docker
-
 
 Docker hub: https://hub.docker.com/repository/docker/metabrainz/serviceregistrator
 
@@ -212,7 +320,6 @@ Image tags:
 
 Images are automatically built and pushed using Git Workflow (in this repo).
 
-
 #### Running (Host mode):
 
 ```bash
@@ -223,9 +330,9 @@ docker run \
   --net=host \
   --volume=/var/run/docker.sock:/var/run/docker.sock \
   metabrainz/serviceregistrator:latest \
-	--ip 127.0.0.1 \
-	--consul-port 8500 \
-	--consul-host localhost
+    --ip 127.0.0.1 \
+    --consul-port 8500 \
+    --consul-host localhost
 ```
 
 #### Running (Network bridge mode):
@@ -238,9 +345,9 @@ docker run \
   --add-host=host.docker.internal:host-gateway \
   --volume=/var/run/docker.sock:/var/run/docker.sock \
   metabrainz/serviceregistrator:latest \
-	--ip 127.0.0.1 \
-	--consul-port 8500 \
-	--consul-host host.docker.internal
+    --ip 127.0.0.1 \
+    --consul-port 8500 \
+    --consul-host host.docker.internal
 ```
 
 ### Examples
