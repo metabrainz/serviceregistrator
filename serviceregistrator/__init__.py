@@ -122,8 +122,8 @@ class Context:
             try:
                 filehandler = logging.FileHandler(filename=logfile)
                 handlers.append(filehandler)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Warning: could not open log file {logfile!r}: {e}", file=sys.stderr)
 
         logging.basicConfig(
             level=logging.ERROR,
