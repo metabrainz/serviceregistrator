@@ -489,13 +489,13 @@ class TestConsulServices(unittest.TestCase):
         result = sr.consul_services()
         assert result == {"svc1": {}}
 
-    def test_connection_error(self):
+    def test_connection_error_returns_empty(self):
         sr = make_registrator()
         from requests.exceptions import ConnectionError
 
         sr.consul_client.agent_services.side_effect = ConnectionError("fail")
-        with self.assertRaises(ConsulConnectionError):
-            sr.consul_services()
+        result = sr.consul_services()
+        assert result == {}
 
     def test_other_exception(self):
         sr = make_registrator()

@@ -537,10 +537,8 @@ class ServiceRegistrator:
     def consul_services(self) -> dict[str, Any]:
         try:
             return self.consul_client.agent_services()
-        except ConnectionError as e:
-            raise ConsulConnectionError(e)
         except Exception as e:
-            log.error(e)
+            log.error(f"Failed to list consul services: {e}")
             return {}
 
     def cleanup(self) -> None:
