@@ -1,5 +1,5 @@
 import unittest
-from serviceregistrator import ContainerMetadata
+from serviceregistrator import ContainerMetadata, ServiceIP
 from serviceregistrator.containerinfo import ContainerInfo
 from serviceregistrator.registrator import Ports
 
@@ -13,7 +13,7 @@ class TestContainerInfoStringRepresentations(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "myhost",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
 
@@ -40,14 +40,14 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
-        port = Ports(internal=80, external=8080, protocol="tcp", ip="10.0.0.5")
-        ip = ci.build_service_ip(port)
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "10.0.0.5"
 
     def test_port_ip_ipv6_wildcard(self):
+        """Wildcard :: is expanded to the default --ip."""
         ci = ContainerInfo(
             "cid",
             "name",
@@ -55,14 +55,14 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
-        port = Ports(internal=80, external=8080, protocol="tcp", ip="::")
-        ip = ci.build_service_ip(port)
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "127.0.0.1"
 
     def test_port_ip_empty(self):
+        """Empty IP is expanded to the default --ip."""
         ci = ContainerInfo(
             "cid",
             "name",
@@ -70,11 +70,10 @@ class TestBuildServiceIpPortSpecific(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
-        port = Ports(internal=80, external=8080, protocol="tcp", ip="")
-        ip = ci.build_service_ip(port)
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "127.0.0.1"
 
 
@@ -91,7 +90,7 @@ class TestServicesDuplicateName(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "svc"})},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -100,8 +99,8 @@ class TestServicesDuplicateName(unittest.TestCase):
         assert "svc-8080" in names
         assert "svc-8081" in names
 
-    def test_duplicate_service_name_skipped(self):
-        """Force build_service_name to return same name for two ports — second is skipped."""
+    def test_duplicate_service_name_different_ids_allowed(self):
+        """Same service name on different ports with different IDs — both registered."""
 
         ci = ContainerInfo(
             "cid",
@@ -113,13 +112,16 @@ class TestServicesDuplicateName(unittest.TestCase):
             ContainerMetadata({"name": "svc"}),
             {},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         # Monkey-patch build_service_name to always return the same name
         ci.build_service_name = lambda port: "svc"
         services = ci.services
-        assert len(services) == 1
+        assert len(services) == 2
+        # Both have the same name but different IDs
+        assert services[0].name == services[1].name == "svc"
+        assert services[0].id != services[1].id
 
 
 class TestBuildServiceIpValidation(unittest.TestCase):
@@ -131,28 +133,28 @@ class TestBuildServiceIpValidation(unittest.TestCase):
             ContainerMetadata({"name": "svc", "ip": service_ip_override}),
             {},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
 
     def test_valid_ipv4(self):
         ci = self._make_ci("10.0.0.1")
-        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "10.0.0.1"
 
     def test_valid_ipv6(self):
         ci = self._make_ci("::1")
-        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "::1"
 
     def test_invalid_ip_shell_injection(self):
         ci = self._make_ci("$(whoami)")
-        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "127.0.0.1"  # falls back to default
 
     def test_invalid_ip_arbitrary_string(self):
         ci = self._make_ci("not-an-ip; rm -rf /")
-        ip = ci.build_service_ip(Ports(internal=80, external=8080, protocol="tcp", ip="0.0.0.0"))
+        ip = ci.build_service_ip(ci.ports[0])
         assert ip == "127.0.0.1"
 
 
@@ -165,7 +167,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc"})},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -188,7 +190,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc"})},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
@@ -203,7 +205,7 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "alias-svc", "tags": "prod,db"})},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         alias = [s for s in ci.services if s.name == "alias-svc"][0]
@@ -211,7 +213,7 @@ class TestBuildServiceAlias(unittest.TestCase):
         assert "db" in alias.tags
 
     def test_alias_name_collision_with_service_name(self):
-        """Alias name same as another service name — alias is skipped."""
+        """Alias name same as service name — both registered (different IDs)."""
         ci = ContainerInfo(
             "cid",
             "name",
@@ -219,10 +221,13 @@ class TestBuildServiceAlias(unittest.TestCase):
             ContainerMetadata(),
             {80: ContainerMetadata({"name": "real-svc", "alias": "real-svc"})},
             "host",
-            "127.0.0.1",
+            [ServiceIP("127.0.0.1")],
             [],
         )
         services = ci.services
-        assert len(services) == 1
-        assert services[0].name == "real-svc"
-        assert services[0].alias_of is None
+        assert len(services) == 2
+        real = [s for s in services if s.alias_of is None][0]
+        alias = [s for s in services if s.alias_of is not None][0]
+        assert real.name == "real-svc"
+        assert alias.name == "real-svc"
+        assert alias.id.endswith(":alias")

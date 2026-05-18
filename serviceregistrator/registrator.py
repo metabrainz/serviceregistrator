@@ -513,7 +513,9 @@ class ServiceRegistrator:
             log.debug(f"no registered container {container_info}")
 
     def is_our_identifier(self, serviceid: str, prefix: str = "") -> tuple[bool, str | None]:
-        identifier = serviceid.split(":")
+        # Strip @tag suffix (IP tag or hash) before parsing
+        base = serviceid.split("@")[0]
+        identifier = base.split(":")
         length = len(identifier)
         if prefix:
             if identifier[0] != prefix:

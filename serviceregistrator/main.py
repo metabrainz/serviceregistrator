@@ -28,6 +28,7 @@ import traceback
 from time import sleep
 
 from serviceregistrator import Context
+from serviceregistrator import ServiceIP
 from serviceregistrator.registrator import ServiceRegistrator, ConsulConnectionError
 
 
@@ -47,6 +48,26 @@ def validate_ip(ctx, param, value):
     return value
 
 
+def parse_ip_tags(ctx, param, value):
+    """Parse multiple --ip values in IP or IP@TAG format."""
+    result = []
+    for entry in value:
+        if "@" in entry:
+            ip, tag = entry.rsplit("@", 1)
+            if not tag:
+                raise click.BadParameter(f"empty tag in: {entry}")
+        else:
+            ip, tag = entry, None
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            raise click.BadParameter(f"invalid IP address: {ip}")
+        result.append(ServiceIP(ip, tag))
+    if not result:
+        raise click.BadParameter("at least one --ip is required")
+    return result
+
+
 POSSIBLE_LEVELS = (
     "CRITICAL",
     "ERROR",
@@ -57,7 +78,14 @@ POSSIBLE_LEVELS = (
 
 
 @click.command()
-@click.option("-i", "--ip", help="address to use for services without SERVICE_IP", required=True, callback=validate_ip)
+@click.option(
+    "-i",
+    "--ip",
+    help="address for services (IP or IP@TAG, repeatable)",
+    required=True,
+    multiple=True,
+    callback=parse_ip_tags,
+)
 @click.option("-t", "--tags", help="comma-separated list of tags to append to all registered services", default="")
 @click.option("-h", "--consul-host", help="consul agent host", default="127.0.0.1", show_default=True)
 @click.option("-p", "--consul-port", help="consul agent port", default=8500, type=click.INT, show_default=True)

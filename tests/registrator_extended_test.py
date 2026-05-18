@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from serviceregistrator import ServiceIP
 from serviceregistrator.registrator import (
     ServiceRegistrator,
     ConsulConnectionError,
@@ -19,7 +20,7 @@ def make_registrator(**ctx_overrides):
         context.options = {
             "debug": False,
             "tags": "",
-            "ip": "127.0.0.1",
+            "ip": [ServiceIP("127.0.0.1")],
             "service_prefix": None,
             "consul_host": "127.0.0.1",
             "consul_port": 8500,

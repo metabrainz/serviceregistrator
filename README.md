@@ -116,8 +116,8 @@ Usage: serviceregistrator [OPTIONS]
   Register docker containers as consul services
 
 Options:
-  -i, --ip TEXT                   address to use for services without
-                                  SERVICE_IP  [required]
+  -i, --ip TEXT                   address for services (IP or IP@TAG,
+                                  repeatable)  [required]
   -t, --tags TEXT                 comma-separated list of tags to append to
                                   all registered services
   -h, --consul-host TEXT          consul agent host  [default: 127.0.0.1]
@@ -216,9 +216,43 @@ docker run -d \
 
 ### Service IP
 
-The `--ip` command-line flag sets the default IP for all services. It can be
-overridden per-container with `SERVICE_IP` or per-port with
-`SERVICE_<port>_IP`.
+The `--ip` flag sets the default address for services. It can be specified
+multiple times and accepts an optional tag using the `IP@TAG` format:
+
+```bash
+serviceregistrator --ip 10.2.2.5                        # single IP, no tag
+serviceregistrator --ip 10.2.2.5@physical               # single IP with tag
+serviceregistrator --ip 10.2.2.5@physical --ip 10.10.10.5@virtual  # two IPs
+```
+
+The `@` separator is used instead of `:` to avoid conflicts with IPv6 addresses.
+
+When multiple `--ip` values are given, containers that listen on all interfaces
+(`0.0.0.0`) are registered once per `--ip` — creating multiple Consul service
+instances under the same service name, each with its own IP and health check.
+Containers that bind a specific IP are registered once with that IP.
+
+When a tag is provided, it is:
+
+- appended to the service's Consul tags (alongside `SERVICE_TAGS` and `--tags`)
+- included in the service ID (e.g., `host:container:8090:physical`)
+
+This lets consumers select a specific network using standard Consul mechanisms:
+
+- DNS: `physical.myapi.service.consul`
+- consul-template: `{{range service "myapi|physical"}}`
+- API: `/v1/health/service/myapi?tag=physical`
+
+The tag is always applied, even with a single `--ip`, enabling a smooth
+migration path:
+
+1. `--ip 10.2.2.5` — current setup, no change
+2. `--ip 10.2.2.5@physical` — tag is added, consumers can start filtering
+3. `--ip 10.2.2.5@physical --ip 10.10.10.5@virtual` — both networks active
+
+Per-container overrides with `SERVICE_IP` or `SERVICE_<port>_IP` still work.
+When a container overrides its IP, the tag from the matching `--ip` entry (if
+any) is applied.
 
 ### Service Alias
 
@@ -303,10 +337,11 @@ Common check options:
 
 The service ID is a cluster-wide unique identifier generated automatically:
 
-    <hostname>:<container-name>:<exposed-port>[:udp if udp]
+    <hostname>:<container-name>:<exposed-port>[:udp if udp][:alias if alias][@tag if tagged]
 
-This is mostly an implementation detail — you typically use service names, not
-IDs.
+When an `--ip` tag is set, it is appended to the ID (e.g.,
+`host:myapp:8080@physical`). This is mostly an implementation detail — you
+typically use service names, not IDs.
 
 ### Docker
 
