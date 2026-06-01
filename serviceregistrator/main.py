@@ -119,6 +119,8 @@ def main(**options):
     context = Context(options)
     delay = context.options["delay"]
     consul_connected = False
+    docker_failures = 0
+    max_docker_failures = 10
 
     try:
         import os
@@ -141,6 +143,7 @@ def main(**options):
         try:
             context.serviceregistrator = ServiceRegistrator(context)
             consul_connected = True
+            docker_failures = 0
             context.serviceregistrator.sync_with_containers()
             context.serviceregistrator.watch_events()
         except ConsulConnectionError as e:
@@ -148,8 +151,17 @@ def main(**options):
                 sleep_delay = 5
             log.error(e)
             consul_connected = False
+            docker_failures = 0
         except docker.errors.DockerException as e:
             log.error(e)
+            docker_failures += 1
+            if docker_failures >= max_docker_failures:
+                log.critical(
+                    f"Docker connection failed {docker_failures} consecutive times. "
+                    "The Docker socket mount is likely stale (Docker daemon was restarted). "
+                    "Exiting so the container restart policy can recover with a fresh mount."
+                )
+                context.kill_now = True
         except Exception as e:
             log.error(e)
             log.error(traceback.format_exc())

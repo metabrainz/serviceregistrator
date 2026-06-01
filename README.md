@@ -355,6 +355,14 @@ Image tags:
 
 Images are automatically built and pushed using Git Workflow (in this repo).
 
+#### Restart policy
+
+Use `--restart always` (or `--restart unless-stopped`). If the Docker daemon
+restarts, the mounted `/var/run/docker.sock` becomes stale and
+ServiceRegistrator can no longer communicate with Docker. After 10 consecutive
+failed connection attempts it exits so that the container restart policy can
+re-create the container with a fresh socket mount.
+
 #### Running (Host mode):
 
 ```bash
