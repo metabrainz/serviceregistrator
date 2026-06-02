@@ -102,7 +102,7 @@ SERVICE_KEYVAL_REGEX = re.compile(r"SERVICE_(?P<key>[^=]+)=(?P<value>.*)$")
 SERVICE_NAME_REGEX = re.compile(r"^[\w_-]+$")
 SERVICE_TAG_REGEX = re.compile(r"^\s*(?P<tag>[\w_-]+)\s*$")
 
-Ports = namedtuple("Ports", ("internal", "external", "protocol", "ip"))
+Ports = namedtuple("Ports", ("internal", "external", "protocol", "ip", "ip_tag"), defaults=(None,))
 
 
 class ServiceRegistrator:
@@ -371,7 +371,15 @@ class ServiceRegistrator:
         name = container.name
         tags = self.parse_tags_string(container, self.context.options["tags"])
         container_info = ContainerInfo(
-            cid, name, ports, metadata, metadata_with_port, self.hostname, self.context.options["ip"], tags
+            cid,
+            name,
+            ports,
+            metadata,
+            metadata_with_port,
+            self.hostname,
+            self.context.options["ip"],
+            tags,
+            ip_mode=self.context.options.get("ip_mode", "tag"),
         )
         if self.context.options["service_prefix"]:
             container_info.service_prefix = self.context.options["service_prefix"]
