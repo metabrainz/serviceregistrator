@@ -46,6 +46,7 @@ class ContainerInfo:
         hostname: str,
         service_ips: list[ServiceIP],
         tags: list[str],
+        ip_mode: str = "tag",
     ) -> None:
         self.cid = cid
         self.name = name
@@ -54,6 +55,7 @@ class ContainerInfo:
         self.hostname = hostname
         self.service_ips = service_ips
         self.ip_tag_map: dict[str, str] = {sip.ip: sip.tag for sip in service_ips if sip.tag}
+        self.ip_mode = ip_mode
         self.service_prefix: str | None = None
         self.tags = [x for x in set(tags) if x]
         self.health: str | None = None
@@ -63,7 +65,7 @@ class ContainerInfo:
         for port in ports:
             if port.ip in {"0.0.0.0", "::", ""}:
                 for sip in service_ips:
-                    self.ports.append(port._replace(ip=sip.ip))
+                    self.ports.append(port._replace(ip=sip.ip, ip_tag=sip.tag))
             else:
                 self.ports.append(port)
 
@@ -109,7 +111,13 @@ class ContainerInfo:
                 seen[name].add((port.external, port.protocol))
         return {name: len(ports) for name, ports in seen.items()}
 
-    def build_service_name(self, port: Any) -> str | None:
+    def _get_port_ip_tag(self, port: Any, ip: str) -> str | None:
+        """Get the IP tag for a port, preferring port.ip_tag over ip_tag_map."""
+        if hasattr(port, "ip_tag"):
+            return port.ip_tag
+        return self.ip_tag_map.get(ip)
+
+    def build_service_name(self, port: Any, ip: str | None = None) -> str | None:
         if self._names_count is None:
             self._names_count = self.unique_ports_count()
         name = self.get_name(port)
@@ -120,6 +128,10 @@ class ContainerInfo:
             name = f"{name}-{port.external}"
             if port.protocol != "tcp":
                 name = f"{name}-{port.protocol}"
+        if self.ip_mode == "prefix" and name:
+            ip_tag = self._get_port_ip_tag(port, ip or "")
+            if ip_tag:
+                name = ip_tag + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
 
     def build_service_tags(self, port: Any, ip: str) -> list[str]:
@@ -128,7 +140,7 @@ class ContainerInfo:
             tags.extend(self.tags)
         if port.protocol != "tcp":
             tags.append(port.protocol)
-        ip_tag = self.ip_tag_map.get(ip)
+        ip_tag = self._get_port_ip_tag(port, ip)
         if ip_tag:
             tags.append(ip_tag)
         return [x for x in set(tags) if x]
@@ -141,12 +153,14 @@ class ContainerInfo:
         """Return a short hash of an IP address for use in service IDs."""
         return hashlib.sha256(ip.encode()).hexdigest()[:8]
 
-    def _has_multiple_ips(self, port: Any) -> bool:
-        """Check if this (external port, protocol) is bound to multiple IPs."""
+    def _has_multiple_untagged_ips(self, port: Any) -> bool:
+        """Check if this (external port, protocol) has multiple untagged IPs."""
         count = sum(
-            1 for p in self.ports if p.external == port.external and p.protocol == port.protocol and p.ip != port.ip
+            1
+            for p in self.ports
+            if p.external == port.external and p.protocol == port.protocol and not getattr(p, "ip_tag", None)
         )
-        return count > 0
+        return count > 1
 
     SERVICE_ID_TAG_SEPARATOR = "@"
 
@@ -158,10 +172,10 @@ class ContainerInfo:
         if port.protocol != "tcp":
             parts.append(str(port.protocol))
         base = self.SERVICE_ID_SEPARATOR.join(parts)
-        tag = self.ip_tag_map.get(ip)
+        tag = self._get_port_ip_tag(port, ip)
         if tag:
             return base + self.SERVICE_ID_TAG_SEPARATOR + tag
-        elif self._has_multiple_ips(port):
+        elif self._has_multiple_untagged_ips(port):
             return base + self.SERVICE_ID_TAG_SEPARATOR + self._ip_hash(ip)
         return base
 
@@ -195,11 +209,11 @@ class ContainerInfo:
 
             services: dict[str, Service] = dict()
             for port in self.ports:
-                service_name = self.build_service_name(port)
+                ip = self.build_service_ip(port)
+                service_name = self.build_service_name(port, ip)
                 if service_name is None:
                     log.info(f"Skipping port {port}, no service name set")
                     continue
-                ip = self.build_service_ip(port)
                 service_id = self.build_service_id(port, ip)
                 if service_id in services:
                     log.warning(f"Service ID already exists: {service_id} ({self})")

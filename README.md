@@ -135,6 +135,9 @@ Options:
   -R, --debug-requests            log requests too (debug)
   -P, --service-prefix TEXT       string to prepend to all service names and
                                   IDs (testing purpose)
+  --ip-mode [tag|prefix]          how to use IP tags: 'tag' adds to Consul
+                                  tags (default), 'prefix' uses tag as service
+                                  name prefix  [default: tag]
   --help                          Show this message and exit.
 ```
 
@@ -253,6 +256,55 @@ migration path:
 Per-container overrides with `SERVICE_IP` or `SERVICE_<port>_IP` still work.
 When a container overrides its IP, the tag from the matching `--ip` entry (if
 any) is applied.
+
+### IP Mode
+
+The `--ip-mode` flag controls how IP tags (the `@TAG` part of `--ip`) are used:
+
+- **`tag`** (default): the tag is added to the service's Consul tags. All IPs
+  register under the **same service name**. Consumers filter by tag.
+- **`prefix`**: the tag is prepended to the **service name**, creating separate
+  services per tagged IP. The tag is also added to Consul tags.
+
+Prefix mode is useful when you need services on different networks to be
+independently discoverable without changing existing consumers.
+
+**Example — prefix mode:**
+
+```bash
+serviceregistrator \
+  --ip 10.2.2.24 \
+  --ip 10.10.10.24@virtual \
+  --ip-mode prefix
+```
+
+A container with `SERVICE_NAME=pgbouncer-master` listening on `0.0.0.0` would
+register:
+
+- `pgbouncer-master` at `10.2.2.24:65436`
+- `virtual-pgbouncer-master` at `10.10.10.24:65436` (tag: `virtual`)
+
+Existing consumers querying `pgbouncer-master` are unaffected. New consumers
+can query `virtual-pgbouncer-master` to reach the service on the virtual
+network.
+
+**Combining tagged and untagged IPs:**
+
+You can use the same IP address both with and without a tag:
+
+```bash
+--ip 10.10.10.24@virtual --ip 10.10.10.24
+```
+
+This registers two services: one prefixed (`virtual-pgbouncer-master`) and one
+without prefix (`pgbouncer-master`), both pointing to the same IP.
+
+**Comparison of modes:**
+
+| Mode | Service name | Tags | Use case |
+|------|-------------|------|----------|
+| `tag` | `pgbouncer-master` | `virtual`, `v2` | Consumers filter by tag (DNS: `virtual.pgbouncer-master.service.consul`) |
+| `prefix` | `virtual-pgbouncer-master` | `virtual`, `v2` | Separate service name per network, no consumer changes needed for existing services |
 
 ### Service Alias
 

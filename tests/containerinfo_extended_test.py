@@ -116,7 +116,7 @@ class TestServicesDuplicateName(unittest.TestCase):
             [],
         )
         # Monkey-patch build_service_name to always return the same name
-        ci.build_service_name = lambda port: "svc"
+        ci.build_service_name = lambda port, ip=None: "svc"
         services = ci.services
         assert len(services) == 2
         # Both have the same name but different IDs

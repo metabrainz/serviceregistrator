@@ -114,6 +114,13 @@ POSSIBLE_LEVELS = (
 @click.option(
     "-P", "--service-prefix", help="string to prepend to all service names and IDs (testing purpose)", default=None
 )
+@click.option(
+    "--ip-mode",
+    help="how to use IP tags: 'tag' adds to Consul tags (default), 'prefix' uses tag as service name prefix",
+    type=click.Choice(["tag", "prefix"], case_sensitive=False),
+    default="tag",
+    show_default=True,
+)
 def main(**options):
     """Register docker containers as consul services"""
     context = Context(options)
