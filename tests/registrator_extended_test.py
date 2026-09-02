@@ -112,6 +112,42 @@ class TestMakeCheck(unittest.TestCase):
         assert result is not None
         assert "http" in result
 
+    def test_proto_http_defaults_http_check(self):
+        # proto=http and no explicit check -> default HTTP check on "/"
+        service = Service("cid", "sid", "sname", "1.2.3.4", 3032, tags=[], attrs={"proto": "http"})
+        result = ServiceRegistrator.make_check(service)
+        assert result is not None
+        assert result["http"] == "http://1.2.3.4:3032/"
+
+    def test_proto_http_does_not_override_explicit_check(self):
+        # An explicit check always wins over the proto=http default
+        service = Service(
+            "cid", "sid", "sname", "1.2.3.4", 3032, tags=[], attrs={"proto": "http", "check_http": "/health"}
+        )
+        result = ServiceRegistrator.make_check(service)
+        assert result is not None
+        assert result["http"] == "http://1.2.3.4:3032/health"
+
+    def test_proto_http_does_not_override_tcp_check(self):
+        # A different explicit check type also wins over the proto=http default
+        service = Service("cid", "sid", "sname", "1.2.3.4", 3032, tags=[], attrs={"proto": "http", "check_tcp": "true"})
+        result = ServiceRegistrator.make_check(service)
+        assert result is not None
+        assert "tcp" in result
+        assert "http" not in result
+
+    def test_proto_uwsgi_no_default_check(self):
+        # proto=uwsgi must NOT get an auto HTTP check (uwsgi socket isn't HTTP)
+        service = Service("cid", "sid", "sname", "1.2.3.4", 3031, tags=[], attrs={"proto": "uwsgi"})
+        result = ServiceRegistrator.make_check(service)
+        assert result is None
+
+    def test_no_proto_no_default_check(self):
+        # No proto attr and no check -> unchanged behaviour (no check)
+        service = Service("cid", "sid", "sname", "1.2.3.4", 80, tags=[], attrs={"region": "us-east"})
+        result = ServiceRegistrator.make_check(service)
+        assert result is None
+
     def test_check_exception(self):
         service = Mock()
         service.attrs = {"check_http": "/health"}
