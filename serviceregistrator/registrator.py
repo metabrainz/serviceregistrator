@@ -433,6 +433,14 @@ class ServiceRegistrator:
                 params[k] = value
                 if check is None and k in valid_checks:
                     check = k
+        # When a service declares it speaks HTTP (proto=http) but configures no
+        # explicit check, default to an HTTP check on "/". Without this, no check
+        # is created and Consul registers the instance as always-healthy -- which
+        # hides a broken (or still non-HTTP) port. An HTTP check also doubles as a
+        # protocol probe: it only passes once the port actually speaks HTTP.
+        if check is None and service.attrs.get("proto") == "http":
+            check = "http"
+            params.setdefault("http", "/")
         if check:
             try:
                 ret = checks[check](service, params)

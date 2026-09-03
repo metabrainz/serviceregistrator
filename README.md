@@ -385,6 +385,14 @@ Common check options:
 | `CHECK_DEREGISTER`     | Deregister after being critical for this duration     |
 | `CHECK_INITIAL_STATUS` | Initial check status (`passing`, `warning`, `critical`) |
 
+**Default check for HTTP services.** If a service declares `proto=http`
+(e.g. `SERVICE_80_proto=http`) and configures **no** explicit `CHECK_*`, an
+HTTP check on `/` is added automatically. Without a check, Consul would treat
+the instance as always-healthy, which hides a broken (or not-yet-HTTP) port; an
+HTTP check also doubles as a protocol probe (it only passes once the port
+actually speaks HTTP). Any explicit `CHECK_*` always takes precedence, and
+`proto=uwsgi` (or no `proto`) does not get an automatic check.
+
 ### Service ID
 
 The service ID is a cluster-wide unique identifier generated automatically:
