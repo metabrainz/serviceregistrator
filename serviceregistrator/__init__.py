@@ -82,8 +82,10 @@ class Context:
         # exit signals
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
-        # following signals may be used later
-        signal.signal(signal.SIGUSR1, self.ignore_signal)
+        # SIGUSR1 toggles DEBUG logging at runtime (no restart needed);
+        # sending it again restores the configured level.
+        signal.signal(signal.SIGUSR1, self.toggle_debug)
+        # SIGUSR2 reserved for future use
         signal.signal(signal.SIGUSR2, self.ignore_signal)
 
         # those signals force a resynchronisation
@@ -103,6 +105,22 @@ class Context:
 
     def ignore_signal(self, signum: int, frame: Any) -> None:
         self._log_signal(signum)
+
+    def toggle_debug(self, signum: int, frame: Any) -> None:
+        """Toggle DEBUG logging at runtime (SIGUSR1).
+
+        Switches the logger to DEBUG; sending the signal again restores the
+        level configured at startup. Lets operators capture debug output on a
+        running instance without a restart (which would drop in-memory state
+        and force a full resync).
+        """
+        self._log_signal(signum)
+        if log.getEffectiveLevel() == logging.DEBUG:
+            log.setLevel(self._configured_loglevel)
+            log.info(f"DEBUG logging disabled, restored level {logging.getLevelName(self._configured_loglevel)}")
+        else:
+            log.setLevel(logging.DEBUG)
+            log.info("DEBUG logging enabled (send SIGUSR1 again to restore)")
 
     def exit_gracefully(self, signum: int, frame: Any) -> None:
         self._log_signal(signum)
@@ -139,3 +157,6 @@ class Context:
             log.setLevel(options["loglevel"])
         except ValueError as e:
             log.error(e)
+        # remember the configured level so SIGUSR1 can restore it after a
+        # temporary switch to DEBUG
+        self._configured_loglevel = log.level

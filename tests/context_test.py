@@ -85,6 +85,75 @@ class TestContext(unittest.TestCase):
         ctx.ignore_signal(10, None)  # SIGUSR1=10
 
     @patch("serviceregistrator.signal.signal")
+    def test_toggle_debug(self, mock_signal):
+        import logging
+
+        options = {"resync": 0, "logfile": None, "loglevel": "INFO"}
+        ctx = Context(options)
+        log = logging.getLogger("serviceregistrator")
+        assert ctx._configured_loglevel == logging.INFO
+
+        # first SIGUSR1 -> DEBUG
+        ctx.toggle_debug(10, None)  # SIGUSR1=10
+        assert log.getEffectiveLevel() == logging.DEBUG
+
+        # second SIGUSR1 -> restore configured level
+        ctx.toggle_debug(10, None)
+        assert log.getEffectiveLevel() == logging.INFO
+        # restore for other tests
+        log.setLevel(logging.INFO)
+
+    @patch("serviceregistrator.signal.signal")
+    def test_toggle_debug_actually_gates_emission(self, mock_signal):
+        """The toggle must change what is actually logged, not just the level.
+
+        We attach our own handler and rely on the logger's effective level to
+        gate records (assertLogs can't be used here: it forces the level and
+        would defeat the suppression checks).
+        """
+        import io
+        import logging
+
+        options = {"resync": 0, "logfile": None, "loglevel": "INFO"}
+        ctx = Context(options)
+        log = logging.getLogger("serviceregistrator")
+        buf = io.StringIO()
+        handler = logging.StreamHandler(buf)
+        handler.setLevel(logging.DEBUG)  # handler passes all; logger level gates
+        handler.setFormatter(logging.Formatter("%(levelname)s:%(message)s"))
+        log.addHandler(handler)
+
+        def emit():
+            log.debug("dbgmsg")
+            log.info("infomsg")
+
+        try:
+            # Before toggle (INFO): DEBUG dropped, INFO emitted.
+            emit()
+            out = buf.getvalue()
+            assert "DEBUG:dbgmsg" not in out
+            assert "INFO:infomsg" in out
+
+            # After 1x SIGUSR1 (DEBUG): DEBUG flows.
+            buf.truncate(0)
+            buf.seek(0)
+            ctx.toggle_debug(10, None)
+            emit()
+            assert "DEBUG:dbgmsg" in buf.getvalue()
+
+            # After 2x SIGUSR1: DEBUG dropped again, INFO still emitted.
+            buf.truncate(0)
+            buf.seek(0)
+            ctx.toggle_debug(10, None)
+            emit()
+            out = buf.getvalue()
+            assert "DEBUG:dbgmsg" not in out
+            assert "INFO:infomsg" in out
+        finally:
+            log.removeHandler(handler)
+            log.setLevel(logging.INFO)
+
+    @patch("serviceregistrator.signal.signal")
     def test_sync_with_containers_signal(self, mock_signal):
         options = {"resync": 0, "logfile": None, "loglevel": "INFO"}
         ctx = Context(options)
