@@ -26,6 +26,23 @@ Key differences from Gliderlabs Registrator:
 - **Periodic resync**: optionally re-synchronize all services on a timer to
   recover from transient Consul issues.
 
+## Signals
+
+serviceregistrator responds to these signals at runtime:
+
+| Signal | Effect |
+| --- | --- |
+| `SIGHUP` / `SIGALRM` | Force a full re-synchronization with running containers |
+| `SIGUSR1` | Toggle `DEBUG` logging on/off (send again to restore the configured level) — capture debug output on a running instance without a restart |
+| `SIGINT` / `SIGTERM` | Graceful shutdown |
+
+Example — turn on debug logging temporarily, then turn it back off:
+
+```bash
+kill -USR1 <pid>   # enable DEBUG
+kill -USR1 <pid>   # restore configured level
+```
+
 ## Use Cases
 
 - **Dynamic service discovery**: automatically populate Consul's catalog so that
