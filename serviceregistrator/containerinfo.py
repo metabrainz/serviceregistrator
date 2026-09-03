@@ -70,7 +70,7 @@ class ContainerInfo:
                 self.ports.append(port)
 
         self._services: list[Service] | None = None
-        self._names_count: dict[str | None, int] | None = None
+        self._names_count: dict[tuple[str | None, frozenset[str]], int] | None = None
 
     def __str__(self) -> str:
         return f"<{self.__class__.__name__}: {self.name} ({self.cid[:10]})>"
@@ -98,18 +98,31 @@ class ContainerInfo:
             return self.service_prefix + self.SERVICE_PREFIX_NAME_SEPARATOR + name
         return name
 
-    def unique_ports_count(self) -> dict[str | None, int]:
-        """Count services with same name, ignoring IP differences.
+    def _port_tagset(self, port: Any) -> frozenset[str]:
+        """Configured tags for a port (SERVICE_<port>_TAGS), as a set.
+
+        Used to tell apart multiple same-named services on one container that
+        are intentionally distinguished by tags (e.g. an uwsgi view tagged
+        ``prod-uwsgi`` and an http view tagged ``prod-http`` on two ports).
+        Such services keep the shared name; only same-name AND same-tag ports
+        get the ``-<port>`` disambiguation suffix.
+        """
+        return frozenset(self.get_attr("tags", port.internal) or [])
+
+    def unique_ports_count(self) -> dict[tuple[str | None, frozenset[str]], int]:
+        """Count services sharing a name AND tag set, ignoring IP differences.
 
         Two ports that differ only by IP (same internal, external, protocol)
         are counted once — they represent the same service on multiple IPs.
+        Ports that share a name but have different tag sets are counted
+        separately: tags disambiguate them, so they keep the shared name.
         """
-        seen: dict[str | None, set[tuple[int, str]]] = defaultdict(set)
+        seen: dict[tuple[str | None, frozenset[str]], set[tuple[int, str]]] = defaultdict(set)
         for port in self.ports:
             name = self.get_name(port)
             if name:
-                seen[name].add((port.external, port.protocol))
-        return {name: len(ports) for name, ports in seen.items()}
+                seen[(name, self._port_tagset(port))].add((port.external, port.protocol))
+        return {key: len(ports) for key, ports in seen.items()}
 
     def _get_port_ip_tag(self, port: Any, ip: str) -> str | None:
         """Get the IP tag for a port, preferring port.ip_tag over ip_tag_map."""
@@ -121,7 +134,7 @@ class ContainerInfo:
         if self._names_count is None:
             self._names_count = self.unique_ports_count()
         name = self.get_name(port)
-        count = self._names_count.get(name, 0)
+        count = self._names_count.get((name, self._port_tagset(port)), 0)
         if count < 1:
             return None
         elif count > 1:
