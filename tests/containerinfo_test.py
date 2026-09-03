@@ -82,14 +82,14 @@ class TestContainerInfo(unittest.TestCase):
 
     def test_names_count(self):
         counts = self.container_info.unique_ports_count()
-        self.assertIn("dummyservice_80_name", counts)
-        self.assertEqual(counts["dummyservice_80_name"], 1)
+        self.assertIn(("dummyservice_80_name", frozenset()), counts)
+        self.assertEqual(counts[("dummyservice_80_name", frozenset())], 1)
 
     def test_names_count_no_name(self):
         self.container_info.metadata = ContainerMetadata()
         self.container_info.ports = [Ports(internal=81, external=8086, protocol="tcp", ip="0.0.0.0")]
         counts = self.container_info.unique_ports_count()
-        self.assertNotIn("dummyservice_80_name", counts)
+        self.assertNotIn(("dummyservice_80_name", frozenset()), counts)
         self.assertEqual(counts, {})
 
     def test_names_count_multiple_services(self):
@@ -104,10 +104,10 @@ class TestContainerInfo(unittest.TestCase):
             Ports(internal=81, external=8087, protocol="tcp", ip="0.0.0.0"),
         ]
         counts = self.container_info.unique_ports_count()
-        self.assertIn("dummyservice_80_name", counts)
-        self.assertIn("dummyservice_81_name", counts)
-        self.assertEqual(counts["dummyservice_80_name"], 1)
-        self.assertEqual(counts["dummyservice_81_name"], 1)
+        self.assertIn(("dummyservice_80_name", frozenset()), counts)
+        self.assertIn(("dummyservice_81_name", frozenset()), counts)
+        self.assertEqual(counts[("dummyservice_80_name", frozenset())], 1)
+        self.assertEqual(counts[("dummyservice_81_name", frozenset())], 1)
 
     def test_names_count_multiple_services_same_name(self):
         self.container_info.metadata = ContainerMetadata({"name": "dummyservice_name"})
@@ -117,8 +117,8 @@ class TestContainerInfo(unittest.TestCase):
             Ports(internal=81, external=8087, protocol="tcp", ip="0.0.0.0"),
         ]
         counts = self.container_info.unique_ports_count()
-        self.assertIn("dummyservice_name", counts)
-        self.assertEqual(counts["dummyservice_name"], 2)
+        self.assertIn(("dummyservice_name", frozenset()), counts)
+        self.assertEqual(counts[("dummyservice_name", frozenset())], 2)
 
     def test_build_service_name(self):
         port = Ports(internal=80, external=8086, protocol="tcp", ip="0.0.0.0")
